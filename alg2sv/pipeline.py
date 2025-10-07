@@ -593,19 +593,15 @@ If providing updated instructions, include target_stage and guidance fields.
         target_stage: str,
         guidance: Optional[str],
         stage_guidance: Dict[str, str],
-    ) -> Tuple[bool, Optional[str]]:
+    ) -> bool:
         """Invalidate downstream results and store guidance for a retry."""
         if target_stage not in self._stage_index_map:
-            return False, "unknown_stage"
-
-        attempts = self.stage_attempts.get(target_stage, 0)
-        if attempts >= self.MAX_STAGE_ATTEMPTS:
-            return False, "retry_limit"
+            return False
 
         self._invalidate_results_from(target_stage)
         if guidance:
             stage_guidance[target_stage] = guidance
-        return True, None
+        return True
 
     def _handle_feedback_decision(
         self,
@@ -625,15 +621,12 @@ If providing updated instructions, include target_stage and guidance fields.
         next_index = current_index + 1
         abort_details: Optional[str] = None
         retry_prepared = True
-        retry_failure: Optional[str] = None
 
         if action == 'abort':
             abort_details = guidance or f"Abort requested after stage '{current_stage}'"
         elif action == 'tune_microarch':
             retry_target = target_stage or 'microarch'
-            retry_prepared, retry_failure = self._prepare_stage_retry(
-                retry_target, guidance, stage_guidance
-            )
+            retry_prepared = self._prepare_stage_retry(retry_target, guidance, stage_guidance)
             if retry_prepared:
                 next_index = self._stage_index_map[retry_target]
             target_stage = retry_target
@@ -641,9 +634,7 @@ If providing updated instructions, include target_stage and guidance fields.
             _, _, suffix = action.partition('_')
             retry_target = suffix or target_stage
             if retry_target:
-                retry_prepared, retry_failure = self._prepare_stage_retry(
-                    retry_target, guidance, stage_guidance
-                )
+                retry_prepared = self._prepare_stage_retry(retry_target, guidance, stage_guidance)
                 if retry_prepared:
                     next_index = self._stage_index_map[retry_target]
                 target_stage = retry_target
@@ -651,15 +642,7 @@ If providing updated instructions, include target_stage and guidance fields.
             if guidance and target_stage:
                 stage_guidance[target_stage] = guidance
 
-        self._log_feedback_action(
-            action,
-            current_stage,
-            target_stage,
-            guidance,
-            abort_details,
-            retry_prepared,
-            retry_failure,
-        )
+        self._log_feedback_action(action, current_stage, target_stage, guidance, abort_details, retry_prepared)
         return next_index, abort_details
 
     def _invalidate_results_from(self, stage_name: str) -> None:
@@ -752,7 +735,6 @@ If providing updated instructions, include target_stage and guidance fields.
         guidance: Optional[str],
         abort_details: Optional[str],
         retry_prepared: bool,
-        retry_failure: Optional[str],
     ) -> None:
         """Emit log messages describing the feedback agent's directive."""
         if action == 'abort':
@@ -770,14 +752,7 @@ If providing updated instructions, include target_stage and guidance fields.
         if action == 'tune_microarch' or action.startswith('retry'):
             stage_label = target_stage or action.split('_', 1)[-1]
             if not retry_prepared:
-                if retry_failure == 'retry_limit':
-                    print(
-                        f"⚠️ Feedback: Retry limit reached for stage '{stage_label}'. Continuing without retry."
-                    )
-                else:
-                    print(
-                        f"⚠️ Feedback: Requested retry for unknown stage '{stage_label}'. Ignoring request."
-                    )
+                print(f"⚠️ Feedback: Requested retry for unknown stage '{stage_label}'. Ignoring request.")
             else:
                 guidance_text = f" Guidance: {guidance}" if guidance else ""
                 print(f"↩️ Feedback: Retry stage '{stage_label}'.{guidance_text}")
