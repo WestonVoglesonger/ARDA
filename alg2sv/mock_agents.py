@@ -38,6 +38,8 @@ class MockAgent:
             return self._mock_verify_agent(input_data)
         elif "Synth" in self.name:
             return self._mock_synth_agent(input_data)
+        elif "Feedback" in self.name:
+            return self._mock_feedback_agent(input_data)
         else:
             return {"error": f"Unknown agent type: {self.name}"}
 
@@ -124,6 +126,28 @@ class MockAgent:
             "slack_ns": 1.23,
             "reports_path": "synth/reports/"
         }
+
+    def _mock_feedback_agent(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Mock feedback agent - decides whether to retry stages."""
+        results = input_data.get('results') if isinstance(input_data, dict) else {}
+        synth = (results or {}).get('synth', {})
+        verify = (results or {}).get('verify', {})
+
+        if synth and not synth.get('timing_met', True):
+            return {
+                "action": "retry_synth",
+                "target_stage": "synth",
+                "guidance": "Timing not met; relax pipeline depth or adjust constraints."
+            }
+
+        if verify and not verify.get('all_passed', True):
+            return {
+                "action": "retry_verify",
+                "target_stage": "verify",
+                "guidance": "Investigate mismatches and expand test coverage."
+            }
+
+        return {"action": "continue"}
 
 
 async def mock_run_workflow(agent: MockAgent, input_data: Dict[str, Any]) -> Any:
