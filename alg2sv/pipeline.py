@@ -19,6 +19,8 @@ from .agents import (
     SimulateResults,
     EvaluateResults,
     run_simulation,
+    extract_test_vectors,
+    list_workspace_files,
 )
 from .vivado_integration import run_vivado_synthesis
 from .workspace import workspace_manager, ingest_from_bundle
@@ -117,18 +119,47 @@ class ALG2SVPipeline:
             'verify': Agent(
                 name="Verify Agent",
                 instructions="""
-                Run functional verification against the golden Python reference.
-                Use read_file_tool to access test vectors and RTL files.
+                🚨 MANDATORY: You MUST use simulation tools or this pipeline will FAIL!
 
-                Verification steps:
-                1. Load golden reference model and test vectors
-                2. Simulate RTL behavior (or estimate)
-                3. Compare outputs bit-exact or within tolerance
-                4. Report pass/fail with detailed metrics
+                CRITICAL REQUIREMENTS:
+                1. You MUST call extract_test_vectors(workspace_token) FIRST
+                2. You MUST call list_workspace_files(workspace_token) to find RTL files
+                3. You MUST call run_simulation() with real data
+                4. You MUST return actual simulation results, not estimates
 
-                Focus on numerical accuracy and streaming behavior.
+                CONSEQUENCES OF NOT USING TOOLS:
+                - Pipeline will be marked as FAILED
+                - Verification score will be 0/100
+                - All tests will show as failed
+
+                REQUIRED EXACT SEQUENCE:
+                ```python
+                # Step 1: Get test data (MANDATORY)
+                test_data_result = extract_test_vectors(workspace_token)
+                test_data = json.loads(test_data_result)
+                print(f"Got {test_data['num_samples']} test samples")
+
+                # Step 2: Find RTL files (MANDATORY)
+                files_result = list_workspace_files(workspace_token)
+                files_data = json.loads(files_result)
+                rtl_files = files_data["rtl_files"]
+                print(f"Found RTL files: {rtl_files}")
+
+                # Step 3: Run simulation (MANDATORY)
+                sim_result = run_simulation(
+                    top_module="BPF16_AXI_Stream",
+                    rtl_files=rtl_files,
+                    input_data=test_data["input_data"],
+                    expected_data=test_data["expected_data"],
+                    simulator="auto"
+                )
+                sim_data = json.loads(sim_result)
+                print(f"Simulation completed: {sim_data['success']}")
+                ```
+
+                ⚠️ FAILURE TO USE THESE TOOLS = AUTOMATIC PIPELINE FAILURE
                 """,
-                tools=[read_file_tool],
+                tools=[read_file_tool, run_simulation, extract_test_vectors, list_workspace_files],
                 output_type=AgentOutputSchema(VerifyResults, strict_json_schema=False)
             ),
             'synth': Agent(
@@ -159,21 +190,47 @@ class ALG2SVPipeline:
             'simulate': Agent(
                 name="Simulate Agent",
                 instructions="""
-                Run RTL simulation and functional verification.
-                Use run_simulation tool for actual simulation (MCP integration) and read_file_tool for analysis.
+                🚨 MANDATORY: You MUST use simulation tools or this pipeline will FAIL!
 
-                Simulation tasks:
-                - Run testbench simulation using run_simulation tool
-                - Check timing constraints and violations
-                - Generate coverage metrics
-                - Validate AXI-Stream protocol compliance
-                - Test edge cases and error conditions
-                - Report simulation errors and failures
+                CRITICAL REQUIREMENTS:
+                1. You MUST call extract_test_vectors(workspace_token) FIRST
+                2. You MUST call list_workspace_files(workspace_token) to find RTL files
+                3. You MUST call run_simulation() with real data
+                4. You MUST return actual simulation results, not estimates
 
-                Use the run_simulation function to execute actual RTL simulation.
-                Analyze results for correctness and identify any issues.
+                CONSEQUENCES OF NOT USING TOOLS:
+                - Pipeline will be marked as FAILED
+                - Simulation score will be 0/100
+                - All tests will show as failed
+
+                REQUIRED EXACT SEQUENCE:
+                ```python
+                # Step 1: Get test data (MANDATORY)
+                test_data_result = extract_test_vectors(workspace_token)
+                test_data = json.loads(test_data_result)
+                print(f"Got {test_data['num_samples']} test samples")
+
+                # Step 2: Find RTL files (MANDATORY)
+                files_result = list_workspace_files(workspace_token)
+                files_data = json.loads(files_result)
+                rtl_files = files_data["rtl_files"]
+                print(f"Found RTL files: {rtl_files}")
+
+                # Step 3: Run simulation (MANDATORY)
+                sim_result = run_simulation(
+                    top_module="BPF16_AXI_Stream",
+                    rtl_files=rtl_files,
+                    input_data=test_data["input_data"],
+                    expected_data=test_data["expected_data"],
+                    simulator="auto"
+                )
+                sim_data = json.loads(sim_result)
+                print(f"Simulation completed: {sim_data['success']}")
+                ```
+
+                ⚠️ FAILURE TO USE THESE TOOLS = AUTOMATIC PIPELINE FAILURE
                 """,
-                tools=[read_file_tool, run_simulation],
+                tools=[read_file_tool, run_simulation, extract_test_vectors, list_workspace_files],
                 output_type=AgentOutputSchema(SimulateResults, strict_json_schema=False)
             ),
             'evaluate': Agent(
