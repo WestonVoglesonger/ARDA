@@ -12,6 +12,8 @@ from typing import Dict, List, Any, Optional, Tuple
 import re
 import time
 
+from agents import function_tool  # Real OpenAI Agents SDK
+
 class VivadoProject:
     """Manages Vivado project creation and synthesis."""
 
@@ -411,6 +413,7 @@ class VivadoIntegration:
 # Global Vivado integration instance
 vivado_integration = VivadoIntegration()
 
+@function_tool
 def run_vivado_synthesis(rtl_files: List[str],
                         top_module: str,
                         fpga_part: str = "xc7z020clg484-1",
