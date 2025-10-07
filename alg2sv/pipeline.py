@@ -6,12 +6,19 @@ Runs the complete algorithm-to-RTL conversion workflow.
 import asyncio
 import json
 from typing import Dict, Any, Optional, List
-from pathlib import Path
 
 from agents import Runner, Agent, AgentOutputSchema  # Real OpenAI Agents SDK
 from .agents import (
-    SpecContract, QuantConfig, MicroArchConfig, RTLConfig, VerifyResults, SynthResults,
-    LintResults, SimulateResults, EvaluateResults, run_simulation
+    SpecContract,
+    QuantConfig,
+    MicroArchConfig,
+    RTLConfig,
+    VerifyResults,
+    SynthResults,
+    LintResults,
+    SimulateResults,
+    EvaluateResults,
+    run_simulation,
 )
 from .vivado_integration import run_vivado_synthesis
 from .workspace import workspace_manager, ingest_from_bundle
@@ -29,7 +36,6 @@ class ALG2SVPipeline:
     def _create_agents(self):
         """Create agents with current workspace context."""
         from .agents import read_file_tool, write_file_tool, set_workspace_context
-
         # Set workspace context for tools
         set_workspace_context(self.current_workspace_token)
 
@@ -311,6 +317,86 @@ class ALG2SVPipeline:
         except Exception as e:
             return self._create_error_result(f"Pipeline failed: {str(e)}")
 
+    def _get_synthesis_instructions(self) -> str:
+        """Get synthesis instructions based on selected backend."""
+        if self.synthesis_backend == "vivado":
+            return """
+            Run REAL FPGA synthesis using Xilinx Vivado to generate actual implementation results.
+            Use run_vivado_synthesis tool to perform actual synthesis, implementation, and bitstream generation.
+
+            Tasks:
+            - Identify RTL files from workspace
+            - Determine top module and FPGA part from metadata or arguments
+            - Run complete Vivado synthesis flow
+            - Parse utilization and timing reports
+            - Generate bitstream if possible
+            - Report actual FPGA resource usage and timing
+
+            Use the run_vivado_synthesis tool to execute real synthesis instead of estimation.
+            """
+        elif self.synthesis_backend == "yosys":
+            return """
+            Run FPGA synthesis using Yosys open-source toolchain for iCE40/ECP5 FPGAs.
+            Use run_yosys_synthesis tool to perform synthesis and generate bitstreams.
+
+            Tasks:
+            - Identify RTL files from workspace
+            - Determine FPGA family (iCE40 or ECP5)
+            - Run Yosys synthesis with appropriate target
+            - Use nextpnr for place and route
+            - Generate .bin bitstream using icepack
+            - Report resource utilization and timing estimates
+
+            Use the run_yosys_synthesis tool for open-source FPGA synthesis.
+            """
+        elif self.synthesis_backend == "symbiflow":
+            return """
+            Run FPGA synthesis using SymbiFlow for Xilinx 7-series FPGAs.
+            Use run_symbiflow_synthesis tool for experimental Xilinx synthesis.
+
+            Tasks:
+            - Identify RTL files from workspace
+            - Configure for Xilinx 7-series FPGA
+            - Run SymbiFlow synthesis toolchain
+            - Generate .bit bitstream if successful
+            - Report resource utilization and timing
+
+            Use the run_symbiflow_synthesis tool for experimental Xilinx synthesis.
+            """
+        else:  # auto
+            return """
+            Run FPGA synthesis using available tools (auto-detect best option).
+            Check for Vivado first, then try open-source alternatives.
+
+            Tasks:
+            - Identify RTL files from workspace
+            - Auto-detect FPGA family from metadata
+            - Try Vivado synthesis first (if available)
+            - Fall back to Yosys/nextpnr for open-source synthesis
+            - Generate appropriate bitstream format
+            - Report synthesis results and resource usage
+
+            Use run_vivado_synthesis or run_yosys_synthesis based on availability.
+            """
+
+    def _get_synthesis_tools(self) -> List:
+        """Get synthesis tools based on selected backend."""
+        from .agents import read_file_tool
+
+        if self.synthesis_backend == "vivado":
+            from .vivado_integration import run_vivado_synthesis
+            return [read_file_tool, run_vivado_synthesis]
+        elif self.synthesis_backend == "yosys":
+            from .open_source_synthesis import run_yosys_synthesis
+            return [read_file_tool, run_yosys_synthesis]
+        elif self.synthesis_backend == "symbiflow":
+            from .open_source_synthesis import run_symbiflow_synthesis
+            return [read_file_tool, run_symbiflow_synthesis]
+        else:  # auto
+            from .vivado_integration import run_vivado_synthesis
+            from .open_source_synthesis import run_yosys_synthesis, run_symbiflow_synthesis
+            return [read_file_tool, run_vivado_synthesis, run_yosys_synthesis, run_symbiflow_synthesis]
+
     async def _run_agent_with_context(self, agent_name: str, context: str) -> Any:
         """Run an agent with workspace context."""
         agent = self.agents[agent_name]
@@ -398,6 +484,87 @@ Provide your output in the required structured format.
         }
 
 
+
+    def _get_synthesis_instructions(self) -> str:
+        """Get synthesis instructions based on selected backend."""
+        if self.synthesis_backend == "vivado":
+            return """
+            Run REAL FPGA synthesis using Xilinx Vivado to generate actual implementation results.
+            Use run_vivado_synthesis tool to perform actual synthesis, implementation, and bitstream generation.
+
+            Tasks:
+            - Identify RTL files from workspace
+            - Determine top module and FPGA part from metadata or arguments
+            - Run complete Vivado synthesis flow
+            - Parse utilization and timing reports
+            - Generate bitstream if possible
+            - Report actual FPGA resource usage and timing
+
+            Use the run_vivado_synthesis tool to execute real synthesis instead of estimation.
+            """
+        elif self.synthesis_backend == "yosys":
+            return """
+            Run FPGA synthesis using Yosys open-source toolchain for iCE40/ECP5 FPGAs.
+            Use run_yosys_synthesis tool to perform synthesis and generate bitstreams.
+
+            Tasks:
+            - Identify RTL files from workspace
+            - Determine FPGA family (iCE40 or ECP5)
+            - Run Yosys synthesis with appropriate target
+            - Use nextpnr for place and route
+            - Generate .bin bitstream using icepack
+            - Report resource utilization and timing estimates
+
+            Use the run_yosys_synthesis tool for open-source FPGA synthesis.
+            """
+        elif self.synthesis_backend == "symbiflow":
+            return """
+            Run FPGA synthesis using SymbiFlow for Xilinx 7-series FPGAs.
+            Use run_symbiflow_synthesis tool for experimental Xilinx synthesis.
+
+            Tasks:
+            - Identify RTL files from workspace
+            - Configure for Xilinx 7-series FPGA
+            - Run SymbiFlow synthesis toolchain
+            - Generate .bit bitstream if successful
+            - Report resource utilization and timing
+
+            Use the run_symbiflow_synthesis tool for experimental Xilinx synthesis.
+            """
+        else:  # auto
+            return """
+            Run FPGA synthesis using available tools (auto-detect best option).
+            Check for Vivado first, then try open-source alternatives.
+
+            Tasks:
+            - Identify RTL files from workspace
+            - Auto-detect FPGA family from metadata
+            - Try Vivado synthesis first (if available)
+            - Fall back to Yosys/nextpnr for open-source synthesis
+            - Generate appropriate bitstream format
+            - Report synthesis results and resource usage
+
+            Use run_vivado_synthesis or run_yosys_synthesis based on availability.
+            """
+
+    def _get_synthesis_tools(self) -> List:
+        """Get synthesis tools based on selected backend."""
+        from .agents import read_file_tool
+        if self.synthesis_backend == "vivado":
+            from .vivado_integration import run_vivado_synthesis
+            return [read_file_tool, run_vivado_synthesis]
+        elif self.synthesis_backend == "yosys":
+            from .open_source_synthesis import run_yosys_synthesis
+            return [read_file_tool, run_yosys_synthesis]
+        elif self.synthesis_backend == "symbiflow":
+            from .open_source_synthesis import run_symbiflow_synthesis
+            return [read_file_tool, run_symbiflow_synthesis]
+        else:  # auto
+            from .vivado_integration import run_vivado_synthesis
+            from .open_source_synthesis import run_yosys_synthesis, run_symbiflow_synthesis
+            return [read_file_tool, run_vivado_synthesis, run_yosys_synthesis, run_symbiflow_synthesis]
+
+
 async def run_pipeline(
     algorithm_bundle: str,
     synthesis_backend: str = "auto",
@@ -408,7 +575,7 @@ async def run_pipeline(
 
     Args:
         algorithm_bundle: Algorithm files in fence format
-        synthesis_backend: Synthesis backend to use ('auto', 'vivado', 'yosys', 'symbiflow')
+        synthesis_backend: FPGA synthesis backend ('auto', 'vivado', 'yosys', 'symbiflow')
         fpga_family: FPGA family for synthesis (e.g., 'xc7a100t', 'ice40hx8k')
 
     Returns:
@@ -416,6 +583,31 @@ async def run_pipeline(
     """
     pipeline = ALG2SVPipeline(synthesis_backend=synthesis_backend, fpga_family=fpga_family)
     return await pipeline.run(algorithm_bundle)
+
+
+def run_pipeline_sync(
+    algorithm_bundle: str,
+    synthesis_backend: str = "auto",
+    fpga_family: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Synchronous wrapper for the ALG2SV pipeline.
+
+    Args:
+        algorithm_bundle: Algorithm files in fence format
+        synthesis_backend: FPGA synthesis backend ('auto', 'vivado', 'yosys', 'symbiflow')
+        fpga_family: FPGA family for synthesis (e.g., 'xc7a100t', 'ice40hx8k')
+
+    Returns:
+        Pipeline results
+    """
+    try:
+        import nest_asyncio
+        nest_asyncio.apply()
+        return asyncio.run(run_pipeline(algorithm_bundle, synthesis_backend, fpga_family))
+    except RuntimeError:
+        # No event loop, create one
+        return asyncio.run(run_pipeline(algorithm_bundle, synthesis_backend, fpga_family))
 
 
 def load_bundle_from_file(filepath: str) -> str:
@@ -428,119 +620,5 @@ def load_bundle_from_file(filepath: str) -> str:
     Returns:
         Bundle content as string
     """
-    path = Path(filepath)
-    if not path.exists():
-        raise FileNotFoundError(f"Bundle file not found: {filepath}")
-
-    with open(path, 'r', encoding='utf-8') as f:
+    with open(filepath, 'r') as f:
         return f.read()
-
-
-# Synchronous wrapper for command-line usage
-def run_pipeline_sync(
-    algorithm_bundle: str,
-    synthesis_backend: str = "auto",
-    fpga_family: Optional[str] = None
-) -> Dict[str, Any]:
-    """Synchronous wrapper for the pipeline.
-
-    Args:
-        algorithm_bundle: Algorithm bundle string
-        synthesis_backend: Synthesis backend to use ('auto', 'vivado', 'yosys', 'symbiflow')
-        fpga_family: FPGA family for synthesis (e.g., 'xc7a100t', 'ice40hx8k')
-
-    Returns:
-        Pipeline execution results
-    """
-    try:
-        # Try to run in existing event loop (for Jupyter/async contexts)
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            # We're in an async context, need to handle differently
-            import nest_asyncio
-            nest_asyncio.apply()
-        return asyncio.run(run_pipeline(algorithm_bundle, synthesis_backend, fpga_family))
-    except RuntimeError:
-        # No event loop, create one
-        return asyncio.run(run_pipeline(algorithm_bundle, synthesis_backend, fpga_family))
-
-
-# Helper methods for synthesis backend configuration
-def _get_synthesis_instructions(self) -> str:
-    """Get synthesis instructions based on selected backend."""
-    if self.synthesis_backend == "vivado":
-        return """
-        Run REAL FPGA synthesis using Xilinx Vivado to generate actual implementation results.
-        Use run_vivado_synthesis tool to perform actual synthesis, implementation, and bitstream generation.
-
-        Tasks:
-        - Identify RTL files from workspace
-        - Determine top module and FPGA part from metadata or arguments
-        - Run complete Vivado synthesis flow
-        - Parse utilization and timing reports
-        - Generate bitstream if possible
-        - Report actual FPGA resource usage and timing
-
-        Use the run_vivado_synthesis tool to execute real synthesis instead of estimation.
-        """
-    elif self.synthesis_backend == "yosys":
-        return """
-        Run FPGA synthesis using Yosys open-source toolchain for iCE40/ECP5 FPGAs.
-        Use run_yosys_synthesis tool to perform synthesis and generate bitstreams.
-
-        Tasks:
-        - Identify RTL files from workspace
-        - Determine FPGA family (iCE40 or ECP5)
-        - Run Yosys synthesis with appropriate target
-        - Use nextpnr for place and route
-        - Generate .bin bitstream using icepack
-        - Report resource utilization and timing estimates
-
-        Use the run_yosys_synthesis tool for open-source FPGA synthesis.
-        """
-    elif self.synthesis_backend == "symbiflow":
-        return """
-        Run FPGA synthesis using SymbiFlow for Xilinx 7-series FPGAs.
-        Use run_symbiflow_synthesis tool for experimental Xilinx synthesis.
-
-        Tasks:
-        - Identify RTL files from workspace
-        - Configure for Xilinx 7-series FPGA
-        - Run SymbiFlow synthesis toolchain
-        - Generate .bit bitstream if successful
-        - Report resource utilization and timing
-
-        Use the run_symbiflow_synthesis tool for experimental Xilinx synthesis.
-        """
-    else:  # auto
-        return """
-        Run FPGA synthesis using available tools (auto-detect best option).
-        Check for Vivado first, then try open-source alternatives.
-
-        Tasks:
-        - Identify RTL files from workspace
-        - Auto-detect FPGA family from metadata
-        - Try Vivado synthesis first (if available)
-        - Fall back to Yosys/nextpnr for open-source synthesis
-        - Generate appropriate bitstream format
-        - Report synthesis results and resource usage
-
-        Use run_vivado_synthesis or run_yosys_synthesis based on availability.
-        """
-
-
-def _get_synthesis_tools(self) -> List:
-    """Get synthesis tools based on selected backend."""
-    if self.synthesis_backend == "vivado":
-        from .vivado_integration import run_vivado_synthesis
-        return [read_file_tool, run_vivado_synthesis]
-    elif self.synthesis_backend == "yosys":
-        from .open_source_synthesis import run_yosys_synthesis
-        return [read_file_tool, run_yosys_synthesis]
-    elif self.synthesis_backend == "symbiflow":
-        from .open_source_synthesis import run_symbiflow_synthesis
-        return [read_file_tool, run_symbiflow_synthesis]
-    else:  # auto
-        from .vivado_integration import run_vivado_synthesis
-        from .open_source_synthesis import run_yosys_synthesis, run_symbiflow_synthesis
-        return [read_file_tool, run_vivado_synthesis, run_yosys_synthesis, run_symbiflow_synthesis]
