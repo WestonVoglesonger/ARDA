@@ -143,7 +143,7 @@ Algorithm → RTL Generation → Synthesis → Bitstream → FPGA Programming �
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-repo/alg2sv.git
+git clone https://github.com/WestonVoglesonger/alg2sv.git
 cd alg2sv
 
 # Install in development mode (recommended for contributors)
