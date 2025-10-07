@@ -157,18 +157,35 @@ Set your OpenAI API key:
 export OPENAI_API_KEY="your-openai-api-key-here"
 ```
 
+### 3. Choose Synthesis Backend
 
-### 2. Test with Example Algorithm
+ALG2SV supports multiple FPGA synthesis backends:
+
+```bash
+# Auto-detect best available backend
+alg2sv examples/bpf16_bundle.txt --synthesis-backend auto
+
+# Xilinx Vivado (for Xilinx 7-series FPGAs)
+alg2sv examples/bpf16_bundle.txt --synthesis-backend vivado --fpga-family xc7a100t
+
+# Open-source Yosys (for iCE40/ECP5 FPGAs)
+alg2sv examples/bpf16_bundle.txt --synthesis-backend yosys --fpga-family ice40hx8k
+
+# Experimental SymbiFlow (for Xilinx 7-series)
+alg2sv examples/bpf16_bundle.txt --synthesis-backend symbiflow --fpga-family xc7a100t
+```
+
+### 4. Test with Example Algorithm
 
 ```bash
 # Run the BPF16 filter example
-alg2sv test_algorithms/bpf16_bundle.txt --verbose --workspace-info
+alg2sv examples/bpf16_bundle.txt --verbose --workspace-info
 
 # Or use the module directly
-python -m alg2sv.cli test_algorithms/bpf16_bundle.txt --verbose
+python -m alg2sv.cli examples/bpf16_bundle.txt --verbose
 ```
 
-### 3. Input Algorithm Format
+### 5. Input Algorithm Format
 
 Create algorithm bundles in this format:
 
@@ -203,7 +220,7 @@ verify:
 ```
 ```
 
-### 4. Run Custom Algorithms
+### 6. Run Custom Algorithms
 
 ```bash
 # Run with your own bundle file
@@ -213,7 +230,7 @@ alg2sv my_algorithm_bundle.txt --output results.json --extract-rtl rtl_output/
 alg2sv --bundle "$(cat my_algorithm_bundle.txt)" --verbose
 ```
 
-### 5. Testing the Pipeline
+### 7. Testing the Pipeline
 
 ### Automated Testing
 

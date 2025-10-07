@@ -20,16 +20,22 @@ def main():
         epilog="""
 Examples:
   # Run with algorithm bundle file
-  python -m alg2sv.cli test_algorithms/bpf16_bundle.txt
+  alg2sv test_algorithms/bpf16_bundle.txt
 
-  # Run with inline bundle string
-  python -m alg2sv.cli --bundle "$(cat test_algorithms/bpf16_bundle.txt)"
+  # Run with Vivado synthesis for Xilinx FPGAs
+  alg2sv test_algorithms/bpf16_bundle.txt --synthesis-backend vivado --fpga-family xc7a100t
+
+  # Run with open-source Yosys for iCE40 FPGAs
+  alg2sv test_algorithms/bpf16_bundle.txt --synthesis-backend yosys --fpga-family ice40hx8k
+
+  # Auto-detect best synthesis backend
+  alg2sv test_algorithms/bpf16_bundle.txt --synthesis-backend auto
 
   # Save results to JSON file
-  python -m alg2sv.cli test_algorithms/bpf16_bundle.txt --output results.json
+  alg2sv test_algorithms/bpf16_bundle.txt --output results.json
 
   # Extract generated RTL files
-  python -m alg2sv.cli test_algorithms/bpf16_bundle.txt --extract-rtl output_dir/
+  alg2sv test_algorithms/bpf16_bundle.txt --extract-rtl output_dir/
         """
     )
 
@@ -65,6 +71,18 @@ Examples:
         help='Verbose output'
     )
 
+    parser.add_argument(
+        '--synthesis-backend', '-s',
+        choices=['auto', 'vivado', 'yosys', 'symbiflow'],
+        default='auto',
+        help='FPGA synthesis backend to use (default: auto-detect)'
+    )
+
+    parser.add_argument(
+        '--fpga-family',
+        help='FPGA family for synthesis (e.g., xc7a100t, ice40hx8k, ecp5)'
+    )
+
     args = parser.parse_args()
 
     # Validate arguments
@@ -89,8 +107,15 @@ Examples:
         if args.verbose:
             print("🚀 Starting ALG2SV pipeline...")
             print(f"Bundle length: {len(algorithm_bundle)} characters")
+            print(f"Synthesis backend: {args.synthesis_backend}")
+            if args.fpga_family:
+                print(f"FPGA family: {args.fpga_family}")
 
-        result = run_pipeline_sync(algorithm_bundle)
+        result = run_pipeline_sync(
+            algorithm_bundle,
+            synthesis_backend=args.synthesis_backend,
+            fpga_family=args.fpga_family
+        )
 
         # Display results
         if result['success']:
