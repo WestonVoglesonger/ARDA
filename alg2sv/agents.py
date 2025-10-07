@@ -4,6 +4,9 @@ Each agent handles a specific stage of the algorithm-to-RTL conversion.
 """
 
 from typing import Dict, Any, List, Optional, Literal
+import os
+import sys
+import types
 from pydantic import BaseModel, Field
 import yaml
 import json
@@ -59,27 +62,43 @@ def extract_test_vectors(workspace_token: str) -> str:
         vectors_result = read_source(workspace_token, "algorithms/bpf16/vectors.py")
         if not vectors_result.get("success"):
             return json.dumps({"error": "Could not read vectors.py", "success": False})
-        
+
         vectors_content = vectors_result["content"]
-        
+        vectors_path = vectors_result.get("path", "algorithms/bpf16/vectors.py")
+        algorithm_dir = os.path.dirname(vectors_path)
+        algo_path = os.path.join(algorithm_dir, "algo.py") if algorithm_dir else "algo.py"
+
+        algo_result = read_source(workspace_token, algo_path)
+        if not algo_result.get("success"):
+            return json.dumps({"error": "Could not read algo.py", "success": False})
+
+        algo_content = algo_result["content"]
+
         # Execute the vectors.py code to generate test data
         # This is a simplified approach - in practice you'd want to be more careful
-        exec_globals = {"np": np}
-        exec_locals = {}
-        exec(vectors_content, exec_globals, exec_locals)
-        
-        # Get the test data
-        if "make_input" in exec_locals:
-            input_data = exec_locals["make_input"](1024)  # Generate 1024 samples
-        else:
-            return json.dumps({"error": "make_input function not found", "success": False})
-        
-        # Run the algorithm to get expected outputs
-        if "run_batch" in exec_locals:
-            expected_data = exec_locals["run_batch"](input_data)
-        else:
-            return json.dumps({"error": "run_batch function not found", "success": False})
-        
+        module = types.ModuleType("algo")
+        module.__dict__["np"] = np
+        sys.modules["algo"] = module
+
+        try:
+            exec(algo_content, module.__dict__)
+            exec(vectors_content, module.__dict__)
+
+            # Get the test data
+            if "make_input" in module.__dict__:
+                input_data = module.__dict__["make_input"](1024)  # Generate 1024 samples
+            else:
+                return json.dumps({"error": "make_input function not found", "success": False})
+
+            # Run the algorithm to get expected outputs
+            if "run_batch" in module.__dict__:
+                expected_data = module.__dict__["run_batch"](input_data)
+            else:
+                return json.dumps({"error": "run_batch function not found", "success": False})
+        finally:
+            if "algo" in sys.modules:
+                del sys.modules["algo"]
+
         result = {
             "success": True,
             "input_data": input_data.tolist() if hasattr(input_data, 'tolist') else list(input_data),
