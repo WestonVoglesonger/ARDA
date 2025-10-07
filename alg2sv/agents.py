@@ -11,51 +11,29 @@ import json
 from agents import function_tool  # Real OpenAI Agents SDK
 from .workspace import read_source, write_artifact, ingest_from_bundle
 from .vivado_integration import run_vivado_synthesis
+from .simulator_integration import run_rtl_simulation, generate_testbench
 
-# MCP-style simulation tool (placeholder for external simulator integration)
+# Real RTL simulation tool (replaces placeholder)
 @function_tool
-def run_simulation(top_module: str, testbench_file: str, simulator: str = "modelsim") -> Dict[str, Any]:
+def run_simulation(top_module: str, 
+                  rtl_files: List[str], 
+                  input_data: List[float],
+                  expected_data: List[float],
+                  simulator: str = "auto") -> str:
     """
-    Run RTL simulation using external simulator.
+    Run real RTL simulation using external simulators.
 
     Args:
         top_module: Top-level module name
-        testbench_file: Path to testbench file
-        simulator: Simulator to use (modelsim, questa, vcs, xcelium)
+        rtl_files: List of RTL file paths
+        input_data: List of input test vectors
+        expected_data: List of expected output vectors
+        simulator: Simulator to use ('auto', 'modelsim', 'questa', 'vcs', 'iverilog')
 
     Returns:
-        Dict with simulation results
+        JSON string with simulation results including test pass/fail counts
     """
-    # This is a placeholder for MCP integration
-    # In a real implementation, this would connect to:
-    # - ModelSim/Questa via TCL commands
-    # - VCS/Xcelium via shell scripts
-    # - Cloud simulation services
-    # - Local Docker containers with simulators
-
-    # TODO: Replace with actual synthesis integration
-    # This would need:
-    # 1. Vivado CLI tools installed
-    # 2. FPGA board connected
-    # 3. Hardware test infrastructure
-
-    return {
-        "success": True,
-        "simulator": simulator,
-        "top_module": top_module,
-        "status": "estimated_simulation_only",  # NO REAL HARDWARE TESTING
-        "test_passed": 1024,
-        "test_failed": 0,
-        "test_total": 1024,
-        "coverage_percent": 95.2,
-        "timing_violations": 0,
-        "simulation_errors": [],
-        "simulation_time_ms": 1250.5,
-        "waveform_available": False,
-        "hardware_verified": False,  # KEY: No actual FPGA testing
-        "bitstream_generated": False,  # KEY: No real synthesis
-        "note": "ESTIMATION ONLY - No real hardware verification implemented"
-    }
+    return run_rtl_simulation(top_module, rtl_files, input_data, expected_data, simulator)
 
 
 # Pydantic models for structured outputs

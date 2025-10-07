@@ -121,14 +121,21 @@ class ALG2SVPipeline:
                 Use read_file_tool to access test vectors and RTL files.
 
                 Verification steps:
-                1. Load golden reference model and test vectors
-                2. Simulate RTL behavior (or estimate)
-                3. Compare outputs bit-exact or within tolerance
-                4. Report pass/fail with detailed metrics
+                1. Load golden reference model and test vectors from workspace
+                2. Extract input/output test data from vectors.py
+                3. Run real RTL simulation using run_simulation tool
+                4. Compare simulation outputs with golden reference
+                5. Report pass/fail with detailed metrics
+
+                IMPORTANT: Use run_simulation tool with:
+                - top_module: From RTL Agent results
+                - rtl_files: Generated RTL files from workspace
+                - test_vectors: Dict with 'input' and 'expected' arrays from test data
+                - simulator: 'auto' for best available simulator
 
                 Focus on numerical accuracy and streaming behavior.
                 """,
-                tools=[read_file_tool],
+                tools=[read_file_tool, run_simulation],
                 output_type=AgentOutputSchema(VerifyResults, strict_json_schema=False)
             ),
             'synth': Agent(
@@ -159,18 +166,25 @@ class ALG2SVPipeline:
             'simulate': Agent(
                 name="Simulate Agent",
                 instructions="""
-                Run RTL simulation and functional verification.
-                Use run_simulation tool for actual simulation (MCP integration) and read_file_tool for analysis.
+                Run real RTL simulation and functional verification.
+                Use run_simulation tool for actual simulation and read_file_tool for analysis.
 
                 Simulation tasks:
-                - Run testbench simulation using run_simulation tool
+                - Load RTL files and test vectors from workspace
+                - Generate SystemVerilog testbench automatically
+                - Run RTL simulation using available simulators (Icarus Verilog, ModelSim, etc.)
                 - Check timing constraints and violations
                 - Generate coverage metrics
                 - Validate AXI-Stream protocol compliance
                 - Test edge cases and error conditions
                 - Report simulation errors and failures
 
-                Use the run_simulation function to execute actual RTL simulation.
+                IMPORTANT: Use run_simulation with:
+                - top_module: The top-level module name from RTL Agent
+                - rtl_files: List of generated RTL files
+                - test_vectors: Dict with 'input' and 'expected' arrays from test data
+                - simulator: 'auto' to auto-detect best available simulator
+
                 Analyze results for correctness and identify any issues.
                 """,
                 tools=[read_file_tool, run_simulation],
@@ -366,25 +380,18 @@ class ALG2SVPipeline:
         else:  # auto
             return """
             Run FPGA synthesis using available tools (auto-detect best option).
-            Prioritize open-source Yosys toolchain, fall back to Vivado if needed.
+            Check for Vivado first, then try open-source alternatives.
 
             Tasks:
             - Identify RTL files from workspace
             - Auto-detect FPGA family from metadata
-            - Try Yosys synthesis first (preferred open-source option)
-            - Fall back to Vivado only if Yosys unavailable and Vivado requested
+            - Try Vivado synthesis first (if available)
+            - Fall back to Yosys/nextpnr for open-source synthesis
             - Generate appropriate bitstream format
             - Report synthesis results and resource usage
 
-            Use run_yosys_synthesis as primary option, run_vivado_synthesis as fallback.
-
-            IMPORTANT: If synthesis tools fail or are unavailable, provide realistic estimates:
-            - For a 16-tap FIR filter: ~150-200 MHz achievable frequency
-            - Resource estimates: ~2000 LUTs, ~1000 FFs, ~16 DSPs
-            - Always set timing_met=True for estimates
-            - Provide reasonable slack values (1-5 ns)
-
-            If tools fail, provide realistic synthesis estimates based on algorithm complexity.            """
+            Use run_vivado_synthesis or run_yosys_synthesis based on availability.
+            """
 
     def _get_synthesis_tools(self) -> List:
         """Get synthesis tools based on selected backend."""
@@ -402,7 +409,7 @@ class ALG2SVPipeline:
         else:  # auto
             from .vivado_integration import run_vivado_synthesis
             from .open_source_synthesis import run_yosys_synthesis, run_symbiflow_synthesis
-            return [read_file_tool, run_yosys_synthesis, run_symbiflow_synthesis, run_vivado_synthesis]
+            return [read_file_tool, run_vivado_synthesis, run_yosys_synthesis, run_symbiflow_synthesis]
 
     async def _run_agent_with_context(self, agent_name: str, context: str) -> Any:
         """Run an agent with workspace context."""
@@ -541,25 +548,18 @@ Provide your output in the required structured format.
         else:  # auto
             return """
             Run FPGA synthesis using available tools (auto-detect best option).
-            Prioritize open-source Yosys toolchain, fall back to Vivado if needed.
+            Check for Vivado first, then try open-source alternatives.
 
             Tasks:
             - Identify RTL files from workspace
             - Auto-detect FPGA family from metadata
-            - Try Yosys synthesis first (preferred open-source option)
-            - Fall back to Vivado only if Yosys unavailable and Vivado requested
+            - Try Vivado synthesis first (if available)
+            - Fall back to Yosys/nextpnr for open-source synthesis
             - Generate appropriate bitstream format
             - Report synthesis results and resource usage
 
-            Use run_yosys_synthesis as primary option, run_vivado_synthesis as fallback.
-
-            IMPORTANT: If synthesis tools fail or are unavailable, provide realistic estimates:
-            - For a 16-tap FIR filter: ~150-200 MHz achievable frequency
-            - Resource estimates: ~2000 LUTs, ~1000 FFs, ~16 DSPs
-            - Always set timing_met=True for estimates
-            - Provide reasonable slack values (1-5 ns)
-
-            If tools fail, provide realistic synthesis estimates based on algorithm complexity.            """
+            Use run_vivado_synthesis or run_yosys_synthesis based on availability.
+            """
 
     def _get_synthesis_tools(self) -> List:
         """Get synthesis tools based on selected backend."""
@@ -576,7 +576,7 @@ Provide your output in the required structured format.
         else:  # auto
             from .vivado_integration import run_vivado_synthesis
             from .open_source_synthesis import run_yosys_synthesis, run_symbiflow_synthesis
-            return [read_file_tool, run_yosys_synthesis, run_symbiflow_synthesis, run_vivado_synthesis]
+            return [read_file_tool, run_vivado_synthesis, run_yosys_synthesis, run_symbiflow_synthesis]
 
 
 async def run_pipeline(
