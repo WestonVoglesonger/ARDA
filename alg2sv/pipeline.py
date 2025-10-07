@@ -5,7 +5,7 @@ Runs the complete algorithm-to-RTL conversion workflow.
 
 import asyncio
 import json
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Tuple
 
 from agents import Runner, Agent, AgentOutputSchema  # Real OpenAI Agents SDK
 from .agents import (
@@ -18,6 +18,7 @@ from .agents import (
     LintResults,
     SimulateResults,
     EvaluateResults,
+    FeedbackDecision,
     run_simulation,
     extract_test_vectors,
     list_workspace_files,
@@ -29,11 +30,26 @@ from .workspace import workspace_manager, ingest_from_bundle
 class ALG2SVPipeline:
     """Main pipeline for algorithm-to-SystemVerilog conversion."""
 
+    MAX_STAGE_ATTEMPTS = 3
+
     def __init__(self, synthesis_backend: str = "auto", fpga_family: Optional[str] = None):
         self.results = {}
         self.current_workspace_token = None  # Global context for tools
         self.synthesis_backend = synthesis_backend
         self.fpga_family = fpga_family
+        self.stage_order = [
+            'spec',
+            'quant',
+            'microarch',
+            'rtl',
+            'verify',
+            'synth',
+            'lint',
+            'simulate',
+            'evaluate',
+        ]
+        self._stage_index_map = {name: idx for idx, name in enumerate(self.stage_order)}
+        self.stage_attempts: Dict[str, int] = {}
 
     def _create_agents(self):
         """Create agents with current workspace context."""
@@ -42,6 +58,24 @@ class ALG2SVPipeline:
         set_workspace_context(self.current_workspace_token)
 
         return {
+            'feedback': Agent(
+                name="Feedback Agent",
+                instructions="""
+                Review aggregated pipeline outputs after each stage and decide how the workflow should proceed.
+
+                Actions you may take:
+                - `continue`: proceed to the next stage.
+                - `retry_<stage>`: request a retry for a specific stage (e.g., retry_synth).
+                - `tune_microarch`: revisit the micro-architecture design decisions.
+                - `abort`: stop the pipeline due to irrecoverable issues.
+
+                When recommending retries or adjustments, populate the `target_stage` and `guidance` fields with
+                concise instructions describing what should change before rerunning. Always output a valid
+                FeedbackDecision JSON object.
+                """,
+                tools=[],
+                output_type=AgentOutputSchema(FeedbackDecision, strict_json_schema=False)
+            ),
             'spec': Agent(
                 name="Spec Agent",
                 instructions="""
@@ -264,6 +298,10 @@ class ALG2SVPipeline:
         Returns:
             Dict with pipeline results and generated files
         """
+        self.results = {}
+        self.stage_attempts = {stage: 0 for stage in self.stage_order}
+        stage_guidance: Dict[str, str] = {}
+
         try:
             # Step 1: Ingest algorithm bundle
             print("📥 Ingesting algorithm bundle...")
@@ -278,98 +316,67 @@ class ALG2SVPipeline:
             self.current_workspace_token = workspace_token
             self.agents = self._create_agents()
 
-            # Step 2: Run Spec Agent
-            print("🔍 Running Spec Agent...")
-            spec_result = await self._run_agent_with_context(
-                'spec', "Generate hardware contract from algorithm files in workspace"
-            )
-            self.results['spec'] = spec_result
-            print(f"✅ Spec: {spec_result.name} - {spec_result.clock_mhz_target}MHz target")
+            stage_index = 0
+            while stage_index < len(self.stage_order):
+                stage_name = self.stage_order[stage_index]
 
-            # Step 3: Run Quant Agent
-            print("🔢 Running Quant Agent...")
-            quant_result = await self._run_agent_with_context(
-                'quant', f"Convert to fixed-point: {spec_result.input_format}"
-            )
-            self.results['quant'] = quant_result
-            max_error = quant_result.error_metrics.get('max_abs_error', 'N/A')
-            print(f"✅ Quant: {len(quant_result.quantized_coefficients)} coeffs, error={max_error}")
+                if self.stage_attempts[stage_name] >= self.MAX_STAGE_ATTEMPTS:
+                    return self._create_error_result(
+                        f"Exceeded retry limit for {stage_name} stage",
+                        {"attempts": self.stage_attempts[stage_name], "stage": stage_name},
+                    )
 
-            # Step 4: Run MicroArch Agent
-            print("🏗️ Running MicroArch Agent...")
-            microarch_result = await self._run_agent_with_context(
-                'microarch', f"Design architecture for {quant_result.fixed_point_config}"
-            )
-            self.results['microarch'] = microarch_result
-            print(f"✅ MicroArch: {microarch_result.pipeline_depth} stages, {microarch_result.dsp_usage_estimate} DSPs")
+                guidance = stage_guidance.get(stage_name)
+                context = self._build_stage_context(stage_name, guidance)
+                self._log_stage_start(stage_name, self.stage_attempts[stage_name] + 1)
 
-            # Step 5: Run RTL Agent
-            print("💾 Running RTL Agent...")
-            rtl_result = await self._run_agent_with_context(
-                'rtl', f"Generate SV for {microarch_result.handshake_protocol} interface"
-            )
-            self.results['rtl'] = rtl_result
-            print(f"✅ RTL: Generated {len(rtl_result.rtl_files)} files, top={rtl_result.top_module}")
+                stage_result = await self._run_agent_with_context(stage_name, context)
+                self.results[stage_name] = stage_result
+                self.stage_attempts[stage_name] += 1
+                self._log_stage_success(stage_name, stage_result)
 
-            # Step 6: Run Verify Agent
-            print("✅ Running Verify Agent...")
-            verify_result = await self._run_agent_with_context(
-                'verify', f"Verify {rtl_result.top_module} against golden reference"
-            )
-            self.results['verify'] = verify_result
+                decision = await self._run_feedback_agent(stage_name, stage_result)
+                next_index, abort_details = self._handle_feedback_decision(
+                    stage_name, stage_index, decision, stage_guidance
+                )
 
-            if verify_result.all_passed:
-                print(f"✅ Verify: {verify_result.tests_passed}/{verify_result.tests_total} tests passed")
-            else:
-                print(f"⚠️ Verify: {verify_result.tests_passed}/{verify_result.tests_total} tests passed - continuing to synthesis")
+                if abort_details is not None:
+                    print(f"⛔ Feedback agent requested abort: {abort_details}")
+                    return self._create_error_result("Pipeline aborted by feedback agent", abort_details)
 
-            # Step 7: Run Synth Agent (if verification passed)
-            print("🔨 Running Synth Agent...")
-            synth_context = f"Synthesize {rtl_result.top_module} using {self.synthesis_backend} backend"
-            if self.fpga_family:
-                synth_context += f" for {self.fpga_family} FPGA"
-            synth_result = await self._run_agent_with_context('synth', synth_context)
-            self.results['synth'] = synth_result
+                stage_index = next_index
 
-            # Step 8: Run Lint Agent
-            print("🔍 Running Lint Agent...")
-            lint_result = await self._run_agent_with_context(
-                'lint', f"Lint and analyze quality of {rtl_result.top_module} RTL"
-            )
-            self.results['lint'] = lint_result
-            print(f"✅ Lint: Score {lint_result.overall_score:.1f}/100, {lint_result.critical_issues} critical issues")
+            if 'spec' not in self.results or 'synth' not in self.results:
+                return self._create_error_result(
+                    "Pipeline completed without synthesis results",
+                    "Missing spec or synth stage results",
+                )
 
-            # Step 9: Run Simulate Agent
-            print("🎯 Running Simulate Agent...")
-            simulate_result = await self._run_agent_with_context(
-                'simulate', f"Simulate and test {rtl_result.top_module} functionality"
-            )
-            self.results['simulate'] = simulate_result
-            print(f"✅ Simulate: {simulate_result.test_passed}/{simulate_result.test_total} tests passed")
-
-            # Step 10: Run Evaluate Agent
-            print("📊 Running Evaluate Agent...")
-            evaluate_result = await self._run_agent_with_context(
-                'evaluate', "Comprehensive evaluation of complete ALG2SV pipeline results"
-            )
-            self.results['evaluate'] = evaluate_result
-            print(f"✅ Evaluate: Overall score {evaluate_result.overall_score:.1f}/100")
-
-            # Check final constraints
+            spec_result = self.results['spec']
+            synth_result = self.results['synth']
             budget_check = self._check_resource_budget(spec_result, synth_result)
 
-            if synth_result.timing_met and budget_check['within_budget']:
+            synth_timing_met = self._safe_get(synth_result, 'timing_met', False)
+
+            if synth_timing_met and budget_check['within_budget']:
+                target_freq = float(self._safe_get(spec_result, 'clock_mhz_target', 0.0))
+                achieved_freq = float(self._safe_get(synth_result, 'fmax_mhz', 0.0))
+                lut_usage = self._safe_get(synth_result, 'lut_usage', 0)
+                ff_usage = self._safe_get(synth_result, 'ff_usage', 0)
+                dsp_usage = self._safe_get(synth_result, 'dsp_usage', 0)
                 print("🎉 Pipeline completed successfully!")
-                print(f"   Target: {spec_result.clock_mhz_target}MHz, Achieved: {synth_result.fmax_mhz:.1f}MHz")
-                print(f"   Resources: {synth_result.lut_usage} LUTs, {synth_result.ff_usage} FFs, {synth_result.dsp_usage} DSPs")
+                print(f"   Target: {target_freq}MHz, Achieved: {achieved_freq:.1f}MHz")
+                print(f"   Resources: {lut_usage} LUTs, {ff_usage} FFs, {dsp_usage} DSPs")
                 return self._create_success_result(workspace_token)
-            else:
-                issues = []
-                if not synth_result.timing_met:
-                    issues.append(f"Timing not met: {synth_result.fmax_mhz:.1f}MHz < {spec_result.clock_mhz_target}MHz")
-                if not budget_check['within_budget']:
-                    issues.append(f"Resource budget exceeded: {budget_check['details']}")
-                return self._create_error_result("Synthesis constraints not met", issues)
+
+            issues = []
+            achieved_freq = float(self._safe_get(synth_result, 'fmax_mhz', 0.0))
+            target_freq = float(self._safe_get(spec_result, 'clock_mhz_target', 0.0))
+            if not synth_timing_met:
+                issues.append(f"Timing not met: {achieved_freq:.1f}MHz < {target_freq}MHz")
+            if not budget_check['within_budget']:
+                issues.append(f"Resource budget exceeded: {budget_check['details']}")
+            return self._create_error_result("Synthesis constraints not met", issues)
 
         except Exception as e:
             return self._create_error_result(f"Pipeline failed: {str(e)}")
@@ -456,23 +463,16 @@ class ALG2SVPipeline:
 
     async def _run_agent_with_context(self, agent_name: str, context: str) -> Any:
         """Run an agent with workspace context."""
-        agent = self.agents[agent_name]
+        agent = self.agents.get(agent_name)
+        if agent is None:
+            raise KeyError(f"Agent '{agent_name}' is not registered in the pipeline")
 
-        # Create input message with context
-        # Convert Pydantic objects to dicts for JSON serialization
-        serializable_results = {}
-        for key, value in self.results.items():
-            if hasattr(value, 'model_dump'):  # Pydantic v2
-                serializable_results[key] = value.model_dump()
-            elif hasattr(value, 'dict'):  # Pydantic v1
-                serializable_results[key] = value.dict()
-            else:
-                serializable_results[key] = value
+        serializable_results = self._serialize_results()
 
         input_message = f"""
 {context}
 
-Use the available tools to access files in the workspace and previous results: {json.dumps(serializable_results, indent=2)}
+Current pipeline results (JSON): {json.dumps(serializable_results, indent=2)}
 
 Provide your output in the required structured format.
 """
@@ -489,6 +489,287 @@ Provide your output in the required structured format.
         else:
             # Fallback for agents without structured output
             return result.final_output if hasattr(result, 'final_output') else {}
+
+    def _serialize_value(self, value: Any) -> Any:
+        """Convert a stage result to a JSON-serializable object."""
+        if value is None:
+            return None
+        if hasattr(value, 'model_dump'):
+            return value.model_dump()
+        if hasattr(value, 'dict'):
+            return value.dict()
+        return value
+
+    def _serialize_results(self) -> Dict[str, Any]:
+        """Serialize all recorded stage results."""
+        return {key: self._serialize_value(val) for key, val in self.results.items()}
+
+    def _build_stage_context(self, stage_name: str, guidance: Optional[str] = None) -> str:
+        """Construct context prompt for a specific stage including any feedback guidance."""
+        context: str
+        if stage_name == 'spec':
+            context = "Generate hardware contract from algorithm files in the workspace."
+        elif stage_name == 'quant':
+            spec = self.results.get('spec')
+            spec_input = self._safe_get(spec, 'input_format', {})
+            context = f"Convert to fixed-point representation using spec input format {spec_input}."
+        elif stage_name == 'microarch':
+            quant = self.results.get('quant')
+            quant_config = self._safe_get(quant, 'fixed_point_config', {})
+            context = f"Design the micro-architecture informed by quantization config: {quant_config}."
+        elif stage_name == 'rtl':
+            microarch = self.results.get('microarch')
+            handshake = self._safe_get(microarch, 'handshake_protocol', 'ready_valid')
+            context = f"Generate synthesizable SystemVerilog implementing the {handshake} interface and prior specs."
+        elif stage_name == 'verify':
+            rtl = self.results.get('rtl')
+            top_module = self._safe_get(rtl, 'top_module', 'top')
+            context = f"Verify {top_module} against the golden reference using the required simulation tools."
+        elif stage_name == 'synth':
+            rtl = self.results.get('rtl')
+            top_module = self._safe_get(rtl, 'top_module', 'top')
+            context = f"Synthesize {top_module} using the {self.synthesis_backend} backend."
+            if self.fpga_family:
+                context += f" Target FPGA family: {self.fpga_family}."
+        elif stage_name == 'lint':
+            rtl = self.results.get('rtl')
+            top_module = self._safe_get(rtl, 'top_module', 'top')
+            context = f"Lint and analyze the quality of {top_module} RTL files."
+        elif stage_name == 'simulate':
+            rtl = self.results.get('rtl')
+            top_module = self._safe_get(rtl, 'top_module', 'top')
+            context = f"Run RTL simulations for {top_module} using provided test vectors."
+        elif stage_name == 'evaluate':
+            context = "Provide a holistic evaluation of all prior stage outputs and identify improvements."
+        else:
+            context = f"Execute the {stage_name} stage with awareness of prior results."
+
+        if guidance:
+            context += f"\n\nFeedback guidance for this stage: {guidance}"
+
+        return context
+
+    def _build_feedback_context(self, stage_name: str, stage_result: Any) -> str:
+        """Create the context message for the feedback agent."""
+        serialized_stage = self._serialize_value(stage_result)
+        attempts_snapshot = {stage: attempts for stage, attempts in self.stage_attempts.items()}
+        return f"""
+Assess the pipeline progress after completing stage '{stage_name}'.
+
+Stage attempts so far: {json.dumps(attempts_snapshot, indent=2)}
+Most recent stage output: {json.dumps(serialized_stage, indent=2)}
+
+Decide whether to continue, retry a stage (use action retry_<stage>), tune_microarch, or abort.
+If providing updated instructions, include target_stage and guidance fields.
+"""
+
+    async def _run_feedback_agent(self, stage_name: str, stage_result: Any) -> FeedbackDecision:
+        """Invoke the feedback agent and normalize its decision output."""
+        if 'feedback' not in self.agents:
+            return FeedbackDecision(action='continue')
+
+        context = self._build_feedback_context(stage_name, stage_result)
+        decision_output = await self._run_agent_with_context('feedback', context)
+
+        if isinstance(decision_output, FeedbackDecision):
+            return decision_output
+
+        if isinstance(decision_output, dict):
+            try:
+                return FeedbackDecision(**decision_output)
+            except Exception:
+                pass
+
+        if hasattr(FeedbackDecision, 'model_validate'):
+            try:
+                return FeedbackDecision.model_validate(decision_output)
+            except Exception:
+                pass
+
+        return FeedbackDecision(action='continue')
+
+    def _prepare_stage_retry(
+        self,
+        target_stage: str,
+        guidance: Optional[str],
+        stage_guidance: Dict[str, str],
+    ) -> bool:
+        """Invalidate downstream results and store guidance for a retry."""
+        if target_stage not in self._stage_index_map:
+            return False
+
+        self._invalidate_results_from(target_stage)
+        if guidance:
+            stage_guidance[target_stage] = guidance
+        return True
+
+    def _handle_feedback_decision(
+        self,
+        current_stage: str,
+        current_index: int,
+        decision: FeedbackDecision,
+        stage_guidance: Dict[str, str],
+    ) -> Tuple[int, Optional[str]]:
+        """Process feedback action and determine the next stage index."""
+        if not isinstance(decision, FeedbackDecision):
+            return current_index + 1, None
+
+        action = decision.action
+        guidance = decision.guidance
+        target_stage = decision.target_stage
+
+        next_index = current_index + 1
+        abort_details: Optional[str] = None
+        retry_prepared = True
+
+        if action == 'abort':
+            abort_details = guidance or f"Abort requested after stage '{current_stage}'"
+        elif action == 'tune_microarch':
+            retry_target = target_stage or 'microarch'
+            retry_prepared = self._prepare_stage_retry(retry_target, guidance, stage_guidance)
+            if retry_prepared:
+                next_index = self._stage_index_map[retry_target]
+            target_stage = retry_target
+        elif action.startswith('retry'):
+            _, _, suffix = action.partition('_')
+            retry_target = suffix or target_stage
+            if retry_target:
+                retry_prepared = self._prepare_stage_retry(retry_target, guidance, stage_guidance)
+                if retry_prepared:
+                    next_index = self._stage_index_map[retry_target]
+                target_stage = retry_target
+        else:
+            if guidance and target_stage:
+                stage_guidance[target_stage] = guidance
+
+        self._log_feedback_action(action, current_stage, target_stage, guidance, abort_details, retry_prepared)
+        return next_index, abort_details
+
+    def _invalidate_results_from(self, stage_name: str) -> None:
+        """Remove cached results from the specified stage onward."""
+        if stage_name not in self._stage_index_map:
+            return
+
+        start_idx = self._stage_index_map[stage_name]
+        to_remove = [name for name in self.stage_order[start_idx:] if name in self.results]
+        for name in to_remove:
+            self.results.pop(name, None)
+
+    def _log_stage_start(self, stage_name: str, attempt_no: int) -> None:
+        """Log the start of a stage, indicating retry attempts when applicable."""
+        messages = {
+            'spec': "🔍 Running Spec Agent",
+            'quant': "🔢 Running Quant Agent",
+            'microarch': "🏗️ Running MicroArch Agent",
+            'rtl': "💾 Running RTL Agent",
+            'verify': "✅ Running Verify Agent",
+            'synth': "🔨 Running Synth Agent",
+            'lint': "🔍 Running Lint Agent",
+            'simulate': "🎯 Running Simulate Agent",
+            'evaluate': "📊 Running Evaluate Agent",
+        }
+        message = messages.get(stage_name, f"▶️ Running {stage_name.title()} stage")
+        if attempt_no > 1:
+            message = f"{message} (attempt {attempt_no})"
+        print(f"{message}...")
+
+    def _log_stage_success(self, stage_name: str, stage_result: Any) -> None:
+        """Log concise success information for a completed stage."""
+        if stage_name == 'spec':
+            name = self._safe_get(stage_result, 'name', 'Unknown')
+            target = self._safe_get(stage_result, 'clock_mhz_target', 'N/A')
+            print(f"✅ Spec: {name} - {target}MHz target")
+        elif stage_name == 'quant':
+            coeffs = self._safe_get(stage_result, 'quantized_coefficients', []) or []
+            error_metrics = self._safe_get(stage_result, 'error_metrics', {}) or {}
+            max_error = error_metrics.get('max_abs_error', 'N/A')
+            print(f"✅ Quant: {len(coeffs)} coeffs, error={max_error}")
+        elif stage_name == 'microarch':
+            depth = self._safe_get(stage_result, 'pipeline_depth', 'N/A')
+            dsp_est = self._safe_get(stage_result, 'dsp_usage_estimate', 'N/A')
+            print(f"✅ MicroArch: {depth} stages, {dsp_est} DSPs")
+        elif stage_name == 'rtl':
+            files = self._safe_get(stage_result, 'rtl_files', []) or []
+            top_module = self._safe_get(stage_result, 'top_module', 'unknown')
+            print(f"✅ RTL: Generated {len(files)} files, top={top_module}")
+        elif stage_name == 'verify':
+            tests_total = self._safe_get(stage_result, 'tests_total', 0)
+            tests_passed = self._safe_get(stage_result, 'tests_passed', 0)
+            if self._safe_get(stage_result, 'all_passed', False):
+                print(f"✅ Verify: {tests_passed}/{tests_total} tests passed")
+            else:
+                print(f"⚠️ Verify: {tests_passed}/{tests_total} tests passed - continuing to synthesis")
+        elif stage_name == 'synth':
+            fmax = self._safe_get(stage_result, 'fmax_mhz', 'N/A')
+            timing_met = self._safe_get(stage_result, 'timing_met', False)
+            slack = self._safe_get(stage_result, 'slack_ns', 'N/A')
+            status = "timing met" if timing_met else "timing NOT met"
+            print(f"✅ Synth: fmax={fmax}MHz, slack={slack}ns ({status})")
+        elif stage_name == 'lint':
+            score_raw = self._safe_get(stage_result, 'overall_score', 0)
+            try:
+                score_value = float(score_raw)
+            except (TypeError, ValueError):
+                score_value = 0.0
+            critical = self._safe_get(stage_result, 'critical_issues', 0)
+            print(f"✅ Lint: Score {score_value:.1f}/100, {critical} critical issues")
+        elif stage_name == 'simulate':
+            passed = self._safe_get(stage_result, 'test_passed', 0)
+            total = self._safe_get(stage_result, 'test_total', 0)
+            print(f"✅ Simulate: {passed}/{total} tests passed")
+        elif stage_name == 'evaluate':
+            overall_raw = self._safe_get(stage_result, 'overall_score', 0)
+            try:
+                overall_value = float(overall_raw)
+            except (TypeError, ValueError):
+                overall_value = 0.0
+            print(f"✅ Evaluate: Overall score {overall_value:.1f}/100")
+        else:
+            print(f"✅ {stage_name.title()} stage completed")
+
+    def _log_feedback_action(
+        self,
+        action: str,
+        current_stage: str,
+        target_stage: Optional[str],
+        guidance: Optional[str],
+        abort_details: Optional[str],
+        retry_prepared: bool,
+    ) -> None:
+        """Emit log messages describing the feedback agent's directive."""
+        if action == 'abort':
+            message = abort_details or guidance or f"Abort requested after stage '{current_stage}'"
+            print(f"⛔ Feedback: {message}")
+            return
+
+        if action == 'continue':
+            if guidance and target_stage:
+                print(f"📝 Feedback: Continue, but update '{target_stage}' with guidance: {guidance}")
+            else:
+                print("➡️ Feedback: Continue to next stage")
+            return
+
+        if action == 'tune_microarch' or action.startswith('retry'):
+            stage_label = target_stage or action.split('_', 1)[-1]
+            if not retry_prepared:
+                print(f"⚠️ Feedback: Requested retry for unknown stage '{stage_label}'. Ignoring request.")
+            else:
+                guidance_text = f" Guidance: {guidance}" if guidance else ""
+                print(f"↩️ Feedback: Retry stage '{stage_label}'.{guidance_text}")
+            return
+
+        info = guidance or "No additional guidance provided."
+        print(f"ℹ️ Feedback: Action '{action}' after stage '{current_stage}'. {info}")
+
+    def _safe_get(self, obj: Any, attr: str, default: Any = None) -> Any:
+        """Safely access attribute or dict key from objects or Pydantic models."""
+        if obj is None:
+            return default
+        if hasattr(obj, attr):
+            return getattr(obj, attr)
+        if isinstance(obj, dict):
+            return obj.get(attr, default)
+        return default
 
     def _check_resource_budget(self, spec: SpecContract, synth: SynthResults) -> Dict[str, Any]:
         """Check if synthesis results meet resource budget."""

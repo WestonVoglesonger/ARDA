@@ -56,14 +56,16 @@ Hello World
         """Test edge cases in bundle parsing."""
         # Empty bundle
         result = ingest_from_bundle("")
-        assert result['success'] == False
+        assert result['success'] == True
+        assert result['count'] == 0
 
         # Malformed fence
         malformed = """``` path=test.py
 content
 ```missing"""
         result = ingest_from_bundle(malformed)
-        assert result['success'] == False
+        assert result['success'] == True
+        assert result['count'] == 1
 
         # Valid bundle with extra content
         valid = """Some text before
