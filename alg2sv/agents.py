@@ -7,12 +7,14 @@ from typing import Dict, Any, List, Optional, Literal
 from pydantic import BaseModel, Field
 import yaml
 import json
+import os
+import sys
+import types
 
 from agents import function_tool  # Real OpenAI Agents SDK
 from .workspace import read_source, write_artifact, ingest_from_bundle, workspace_manager
 from .vivado_integration import run_vivado_synthesis
 from .simulator_integration import run_rtl_simulation, generate_testbench
-import json
 import numpy as np
 
 
@@ -61,24 +63,42 @@ def extract_test_vectors(workspace_token: str) -> str:
             return json.dumps({"error": "Could not read vectors.py", "success": False})
         
         vectors_content = vectors_result["content"]
-        
-        # Execute the vectors.py code to generate test data
-        # This is a simplified approach - in practice you'd want to be more careful
-        exec_globals = {"np": np}
-        exec_locals = {}
-        exec(vectors_content, exec_globals, exec_locals)
-        
-        # Get the test data
-        if "make_input" in exec_locals:
-            input_data = exec_locals["make_input"](1024)  # Generate 1024 samples
-        else:
+        vectors_path = vectors_result.get("path", "algorithms/bpf16/vectors.py")
+        vectors_dir = os.path.dirname(vectors_path)
+
+        algo_path = os.path.join(vectors_dir, "algo.py")
+        algo_result = read_source(workspace_token, algo_path)
+        if not algo_result.get("success"):
+            return json.dumps({
+                "error": f"Could not read companion algo.py at {algo_path}",
+                "success": False
+            })
+
+        algo_content = algo_result["content"]
+
+        module_name = "algo"
+        algo_module = types.ModuleType(module_name)
+        algo_module.__dict__["np"] = np
+
+        exec_namespace = algo_module.__dict__
+        sys.modules[module_name] = algo_module
+        try:
+            exec(algo_content, exec_namespace)
+            exec(vectors_content, exec_namespace)
+        finally:
+            sys.modules.pop(module_name, None)
+
+        make_input_fn = exec_namespace.get("make_input")
+        if make_input_fn is None:
             return json.dumps({"error": "make_input function not found", "success": False})
-        
-        # Run the algorithm to get expected outputs
-        if "run_batch" in exec_locals:
-            expected_data = exec_locals["run_batch"](input_data)
-        else:
+
+        input_data = make_input_fn(1024)
+
+        run_batch_fn = exec_namespace.get("run_batch")
+        if run_batch_fn is None:
             return json.dumps({"error": "run_batch function not found", "success": False})
+
+        expected_data = run_batch_fn(input_data)
         
         result = {
             "success": True,
