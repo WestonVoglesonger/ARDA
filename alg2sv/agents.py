@@ -12,6 +12,59 @@ from agents import function_tool  # Real OpenAI Agents SDK
 from .workspace import read_source, write_artifact, ingest_from_bundle
 from .vivado_integration import run_vivado_synthesis
 from .simulator_integration import run_rtl_simulation, generate_testbench
+import json
+import numpy as np
+
+
+@function_tool
+def extract_test_vectors(workspace_token: str) -> str:
+    """
+    Extract test vectors from workspace files for simulation.
+    
+    Args:
+        workspace_token: Workspace identifier
+        
+    Returns:
+        JSON string with input and expected test vectors
+    """
+    try:
+        # Read vectors.py file to get test data
+        vectors_result = read_source(workspace_token, "algorithms/bpf16/vectors.py")
+        if not vectors_result.get("success"):
+            return json.dumps({"error": "Could not read vectors.py", "success": False})
+        
+        vectors_content = vectors_result["content"]
+        
+        # Execute the vectors.py code to generate test data
+        # This is a simplified approach - in practice you'd want to be more careful
+        exec_globals = {"np": np}
+        exec_locals = {}
+        exec(vectors_content, exec_globals, exec_locals)
+        
+        # Get the test data
+        if "make_input" in exec_locals:
+            input_data = exec_locals["make_input"](1024)  # Generate 1024 samples
+        else:
+            return json.dumps({"error": "make_input function not found", "success": False})
+        
+        # Run the algorithm to get expected outputs
+        if "run_batch" in exec_locals:
+            expected_data = exec_locals["run_batch"](input_data)
+        else:
+            return json.dumps({"error": "run_batch function not found", "success": False})
+        
+        result = {
+            "success": True,
+            "input_data": input_data.tolist() if hasattr(input_data, 'tolist') else list(input_data),
+            "expected_data": expected_data.tolist() if hasattr(expected_data, 'tolist') else list(expected_data),
+            "num_samples": len(input_data)
+        }
+        
+        return json.dumps(result)
+        
+    except Exception as e:
+        return json.dumps({"error": f"Failed to extract test vectors: {str(e)}", "success": False})
+
 
 # Real RTL simulation tool (replaces placeholder)
 @function_tool
