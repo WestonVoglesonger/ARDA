@@ -1,0 +1,70 @@
+algorithm:
+  name: "FFT256"
+  description: "256-point Fast Fourier Transform using Cooley-Tukey algorithm with fixed-point arithmetic"
+  version: "1.0"
+  author: "ALG2SV Pipeline"
+  license: "MIT"
+
+interface:
+  input:
+    type: "real_array"
+    size: 256
+    data_type: "float32"
+    description: "256 real-valued time-domain samples"
+
+  output:
+    type: "complex_array"
+    size: 256
+    data_type: "complex64"
+    description: "256 complex frequency-domain coefficients (real/imaginary interleaved)"
+
+  step_function: "fft_step_function"
+
+performance:
+  target_frequency_mhz: 150.0
+  throughput_samples_per_second: 38400000  # 256 samples * 150MHz
+  latency_cycles_max: 4096  # Allow for pipelined implementation
+  power_budget_mw: 500
+
+resource_budget:
+  lut: 15000
+  ff: 20000
+  dsp: 64
+  bram: 16
+
+fp_config:
+  total_bits: 16
+  frac_bits: 12
+  input_format:
+    width: 16
+    fractional_bits: 12
+  coeff_format:
+    width: 16
+    fractional_bits: 13
+  output_format:
+    width: 18
+    fractional_bits: 14
+
+implementation:
+  architecture: "streaming_pipeline"
+  stages: 8  # log2(256)
+  memory_type: "distributed_ram"  # For twiddle factors
+  optimization_goals:
+    - "timing_closure"
+    - "resource_efficiency"
+    - "numerical_accuracy"
+
+verification:
+  test_vectors_count: 100
+  accuracy_threshold_db: 60  # SNR requirement
+  corner_cases:
+    - "dc_signal"
+    - "nyquist_frequency"
+    - "impulse_response"
+    - "noise_floor"
+  golden_reference: "numpy.fft.fft"
+
+axi_interface:
+  data_width: 32  # 16-bit real + 16-bit imaginary
+  addr_width: 8   # log2(256)
+  max_burst_length: 256

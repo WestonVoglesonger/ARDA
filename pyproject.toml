@@ -1,0 +1,88 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "alg2sv"
+version = "0.1.0"
+description = "Convert Python algorithms to SystemVerilog RTL using AI agents"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "ALG2SV Team"},
+]
+keywords = [
+    "fpga",
+    "hdl",
+    "systemverilog",
+    "rtl",
+    "synthesis",
+    "ai",
+    "agents",
+    "hardware",
+    "dsp"
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Scientific/Engineering :: Electronic Design Automation (EDA)",
+    "Topic :: Software Development :: Code Generators",
+]
+requires-python = ">=3.8"
+dependencies = [
+    "openai-agents>=0.0.1",
+    "numpy>=1.21.0",
+    "PyYAML>=6.0",
+    "pydantic>=2.0.0",
+    "typing-extensions>=4.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/your-repo/alg2sv"
+Repository = "https://github.com/your-repo/alg2sv"
+Documentation = "https://github.com/your-repo/alg2sv#readme"
+
+[project.scripts]
+alg2sv = "alg2sv.cli:main"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["alg2sv*"]
+exclude = ["tests*", "test_*", "*.tests*", "*.tests.*"]
+
+# Black code formatting
+[tool.black]
+line-length = 100
+target-version = ['py38']
+include = '\.pyi?$'
+
+# isort import sorting
+[tool.isort]
+profile = "black"
+line_length = 100
+src_paths = ["alg2sv", "tests"]
+
+# MyPy type checking
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+
+# Pytest configuration
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = "-ra -q"
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]

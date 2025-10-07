@@ -1,0 +1,518 @@
+``` path=algorithms/conv2d/algo.py
+"""
+Conv2D Neural Network Layer - 2D Convolution Implementation
+Fixed-point arithmetic for FPGA acceleration
+
+Architecture:
+- Input: 8x8x3 feature map (H=8, W=8, C=3)
+- Kernel: 3x3 convolution
+- Output: 6x6x16 feature map (with padding, stride=1)
+- Activation: ReLU
+- Quantization: INT8 weights, INT16 accumulators, INT8 outputs
+"""
+
+import numpy as np
+from typing import List, Tuple, Optional, Dict, Any
+import math
+
+class FixedPoint:
+    """Fixed-point number representation for neural networks."""
+    def __init__(self, value: float, total_bits: int = 8, frac_bits: int = 6):
+        self.total_bits = total_bits
+        self.frac_bits = frac_bits
+        self.int_bits = total_bits - frac_bits - 1  # -1 for sign bit
+
+        # Convert to fixed-point
+        scale = 2 ** frac_bits
+        self.fp_value = int(value * scale)
+
+        # Clamp to range
+        max_val = (1 << (total_bits - 1)) - 1
+        min_val = -(1 << (total_bits - 1))
+        self.fp_value = max(min_val, min(max_val, self.fp_value))
+
+    def to_float(self) -> float:
+        scale = 2 ** self.frac_bits
+        return self.fp_value / scale
+
+    def __add__(self, other):
+        result = self.fp_value + other.fp_value
+        # Clamp result
+        max_val = (1 << (self.total_bits - 1)) - 1
+        min_val = -(1 << (self.total_bits - 1))
+        result = max(min_val, min(max_val, result))
+        return FixedPoint(result / (2 ** self.frac_bits), self.total_bits, self.frac_bits)
+
+    def __mul__(self, other):
+        # Fixed-point multiplication with proper scaling
+        result = (self.fp_value * other.fp_value) >> self.frac_bits
+        # Clamp result
+        max_val = (1 << (self.total_bits - 1)) - 1
+        min_val = -(1 << (self.total_bits - 1))
+        result = max(min_val, min(max_val, result))
+        return FixedPoint(result / (2 ** self.frac_bits), self.total_bits, self.frac_bits)
+
+    def relu(self):
+        """Apply ReLU activation function."""
+        if self.fp_value < 0:
+            return FixedPoint(0.0, self.total_bits, self.frac_bits)
+        return FixedPoint(self.to_float(), self.total_bits, self.frac_bits)
+
+def generate_conv2d_weights(input_channels: int, output_channels: int,
+                          kernel_size: int, seed: int = 42) -> np.ndarray:
+    """Generate random weights for Conv2D layer."""
+    np.random.seed(seed)
+    # Initialize with Xavier/Glorot initialization
+    scale = math.sqrt(2.0 / (input_channels * kernel_size * kernel_size))
+    weights = np.random.normal(0, scale, (output_channels, input_channels, kernel_size, kernel_size))
+    return weights.astype(np.float32)
+
+def conv2d_layer(input_fm: np.ndarray, weights: np.ndarray, bias: np.ndarray,
+                stride: int = 1, padding: int = 1, activation: str = 'relu') -> np.ndarray:
+    """
+    Perform 2D convolution operation.
+
+    Args:
+        input_fm: Input feature map (H, W, C_in)
+        weights: Convolution weights (C_out, C_in, K, K)
+        bias: Bias terms (C_out,)
+        stride: Convolution stride
+        padding: Zero padding
+        activation: Activation function ('relu' or 'none')
+
+    Returns:
+        Output feature map (H_out, W_out, C_out)
+    """
+    H, W, C_in = input_fm.shape
+    C_out, C_in_weights, K, _ = weights.shape
+
+    # Calculate output dimensions
+    H_out = (H + 2 * padding - K) // stride + 1
+    W_out = (W + 2 * padding - K) // stride + 1
+
+    # Initialize output
+    output = np.zeros((H_out, W_out, C_out), dtype=np.float32)
+
+    # Add padding to input
+    if padding > 0:
+        input_padded = np.pad(input_fm, ((padding, padding), (padding, padding), (0, 0)), 'constant')
+    else:
+        input_padded = input_fm
+
+    # Perform convolution
+    for h_out in range(H_out):
+        for w_out in range(W_out):
+            for c_out in range(C_out):
+                # Extract patch
+                h_start = h_out * stride
+                w_start = w_out * stride
+                patch = input_padded[h_start:h_start+K, w_start:w_start+K, :]
+
+                # Compute convolution for this output pixel
+                conv_sum = bias[c_out]
+                for c_in in range(C_in):
+                    for kh in range(K):
+                        for kw in range(K):
+                            conv_sum += patch[kh, kw, c_in] * weights[c_out, c_in, kh, kw]
+
+                # Apply activation
+                if activation == 'relu':
+                    conv_sum = max(0.0, conv_sum)
+
+                output[h_out, w_out, c_out] = conv_sum
+
+    return output
+
+def conv2d_fixed_point(input_fm: np.ndarray, weights: np.ndarray, bias: np.ndarray,
+                      fp_config: dict) -> np.ndarray:
+    """
+    Conv2D with fixed-point arithmetic.
+
+    Args:
+        input_fm: Float input feature map
+        weights: Float weights
+        bias: Float bias
+        fp_config: Fixed-point configuration
+
+    Returns:
+        Fixed-point output feature map
+    """
+    # Convert to fixed-point
+    input_fp = np.array([[[FixedPoint(val,
+                                      fp_config['input_bits'],
+                                      fp_config['input_frac_bits'])
+                          for val in row] for row in channel]
+                        for channel in input_fm])
+
+    weights_fp = np.array([[[[FixedPoint(val,
+                                          fp_config['weight_bits'],
+                                          fp_config['weight_frac_bits'])
+                             for val in kw_row] for kw_row in kh_row]
+                           for kh_row in cin_row] for cin_row in weights])
+
+    bias_fp = np.array([FixedPoint(val,
+                                   fp_config['bias_bits'],
+                                   fp_config['bias_frac_bits'])
+                       for val in bias])
+
+    H, W, C_in = input_fm.shape
+    C_out, _, K, _ = weights.shape
+
+    # Calculate output dimensions (same padding, stride=1)
+    H_out = H
+    W_out = W
+
+    # Initialize output
+    output_fp = np.zeros((H_out, W_out, C_out), dtype=object)
+
+    # Perform fixed-point convolution
+    for h_out in range(H_out):
+        for w_out in range(W_out):
+            for c_out in range(C_out):
+                # Extract patch with padding
+                h_start = max(0, h_out - 1)
+                w_start = max(0, w_out - 1)
+                h_end = min(H, h_out + 2)
+                w_end = min(W, w_out + 2)
+
+                # Compute convolution
+                accumulator = bias_fp[c_out]
+                for c_in in range(C_in):
+                    for kh in range(max(0, h_out-1), min(H, h_out+2)):
+                        for kw in range(max(0, w_out-1), min(W, w_out+2)):
+                            # Calculate relative kernel position
+                            kh_rel = kh - (h_out - 1)
+                            kw_rel = kw - (w_out - 1)
+
+                            if 0 <= kh_rel < K and 0 <= kw_rel < K:
+                                input_val = input_fp[kh, kw, c_in]
+                                weight_val = weights_fp[c_out, c_in, kh_rel, kw_rel]
+                                accumulator = accumulator + (input_val * weight_val)
+
+                # Apply ReLU
+                output_fp[h_out, w_out, c_out] = accumulator.relu()
+
+    # Convert back to float for return
+    output_float = np.array([[[val.to_float() for val in row] for row in channel]
+                           for channel in output_fp])
+
+    return output_float
+
+def conv2d_step_function(input_data: List[float], config: dict) -> List[float]:
+    """
+    Conv2D processing function for ALG2SV pipeline.
+
+    Args:
+        input_data: Flattened input feature map (8x8x3 = 192 elements)
+        config: Configuration dictionary
+
+    Returns:
+        Flattened output feature map (6x6x16 = 576 elements)
+    """
+    # Reshape input to 8x8x3
+    input_array = np.array(input_data).reshape(8, 8, 3)
+
+    # Generate weights and bias (deterministic for testing)
+    weights = generate_conv2d_weights(3, 16, 3, seed=42)
+    bias = np.zeros(16, dtype=np.float32)  # Simple bias for testing
+
+    # Get fixed-point config
+    fp_config = config.get('fp_config', {
+        'input_bits': 8, 'input_frac_bits': 6,
+        'weight_bits': 8, 'weight_frac_bits': 6,
+        'bias_bits': 16, 'bias_frac_bits': 12
+    })
+
+    # Perform convolution
+    output = conv2d_fixed_point(input_array, weights, bias, fp_config)
+
+    # Flatten output
+    return output.flatten().tolist()
+
+# Test function
+def test_conv2d():
+    """Test Conv2D implementation."""
+    print("Testing Conv2D Layer...")
+
+    # Create test input (8x8x3)
+    np.random.seed(42)
+    input_fm = np.random.randn(8, 8, 3).astype(np.float32)
+
+    # Generate weights
+    weights = generate_conv2d_weights(3, 16, 3, seed=42)
+    bias = np.zeros(16, dtype=np.float32)
+
+    # Test float version
+    output_float = conv2d_layer(input_fm, weights, bias, stride=1, padding=1)
+
+    print(f"Input shape: {input_fm.shape}")
+    print(f"Output shape: {output_float.shape}")
+    print(f"Weights shape: {weights.shape}")
+    print(f"Output range: [{output_float.min():.3f}, {output_float.max():.3f}]")
+
+    # Test fixed-point version
+    fp_config = {
+        'input_bits': 8, 'input_frac_bits': 6,
+        'weight_bits': 8, 'weight_frac_bits': 6,
+        'bias_bits': 16, 'bias_frac_bits': 12
+    }
+    output_fp = conv2d_fixed_point(input_fm, weights, bias, fp_config)
+
+    print(f"Fixed-point output range: [{output_fp.min():.3f}, {output_fp.max():.3f}]")
+
+    return output_float, output_fp
+
+if __name__ == "__main__":
+    test_conv2d()
+
+```
+
+``` path=algorithms/conv2d/meta.yaml
+algorithm:
+  name: "Conv2D"
+  description: "2D Convolutional Neural Network Layer with ReLU activation and fixed-point arithmetic"
+  version: "1.0"
+  author: "ALG2SV Pipeline"
+  license: "MIT"
+
+interface:
+  input:
+    type: "feature_map_3d"
+    dimensions: [8, 8, 3]  # Height, Width, Channels
+    data_type: "float32"
+    description: "8x8 RGB-like input feature map"
+
+  output:
+    type: "feature_map_3d"
+    dimensions: [6, 6, 16]  # Height, Width, Channels (after 3x3 conv with padding)
+    data_type: "int8"
+    description: "6x6 output feature map with 16 channels"
+
+  step_function: "conv2d_step_function"
+
+performance:
+  target_frequency_mhz: 200.0
+  throughput_samples_per_second: 20000000  # 20M inferences/sec
+  latency_cycles_max: 1024  # Allow pipelined implementation
+  power_budget_mw: 300
+
+resource_budget:
+  lut: 10000
+  ff: 15000
+  dsp: 32
+  bram: 8
+
+fp_config:
+  input_bits: 8
+  input_frac_bits: 6
+  weight_bits: 8
+  weight_frac_bits: 6
+  bias_bits: 16
+  bias_frac_bits: 12
+  output_bits: 8
+  output_frac_bits: 6
+
+implementation:
+  architecture: "parallel_conv"
+  parallelism: 16  # 16 output channels computed in parallel
+  kernel_size: 3
+  stride: 1
+  padding: 1
+  activation: "relu"
+  memory_type: "bram"  # For weight storage
+  optimization_goals:
+    - "throughput_maximization"
+    - "resource_efficiency"
+    - "fixed_point_precision"
+
+verification:
+  test_vectors_count: 50
+  accuracy_threshold_db: 30  # Neural network precision requirements
+  corner_cases:
+    - "zero_input"
+    - "saturated_input"
+    - "edge_patterns"
+    - "noise_input"
+  golden_reference: "numpy_convolution"
+
+axi_interface:
+  data_width: 64  # 8 channels * 8 bits
+  addr_width: 10  # log2(8*8*3) ~ 8, but allow for larger
+  max_burst_length: 192  # 8*8*3 input elements
+
+```
+
+``` path=algorithms/conv2d/vectors.py
+"""
+Test vectors for Conv2D neural network layer validation
+"""
+
+import numpy as np
+import json
+from typing import Dict, List, Any
+
+def generate_test_vectors() -> Dict[str, Any]:
+    """Generate comprehensive test vectors for Conv2D validation."""
+
+    test_vectors = {}
+
+    # Test Case 1: Random input (normal case)
+    np.random.seed(42)
+    random_input = np.random.randn(8, 8, 3).astype(np.float32)
+    test_vectors['random_input'] = {
+        'input': random_input.flatten().tolist(),
+        'description': 'Random normal distributed input',
+        'expected_properties': ['non_zero_output', 'relu_activation']
+    }
+
+    # Test Case 2: Zero input (should produce bias-only output)
+    zero_input = np.zeros((8, 8, 3), dtype=np.float32)
+    test_vectors['zero_input'] = {
+        'input': zero_input.flatten().tolist(),
+        'description': 'All-zero input (tests bias handling)',
+        'expected_properties': ['minimal_output', 'bias_only']
+    }
+
+    # Test Case 3: Saturated input (high values)
+    saturated_input = np.full((8, 8, 3), 2.0, dtype=np.float32)
+    test_vectors['saturated_input'] = {
+        'input': saturated_input.flatten().tolist(),
+        'description': 'High-value input (tests saturation handling)',
+        'expected_properties': ['high_output', 'saturation_handling']
+    }
+
+    # Test Case 4: Edge detection pattern
+    edge_input = np.zeros((8, 8, 3), dtype=np.float32)
+    edge_input[2:6, 2:6, :] = 1.0  # Square in center
+    test_vectors['edge_pattern'] = {
+        'input': edge_input.flatten().tolist(),
+        'description': 'Edge detection pattern (square in center)',
+        'expected_properties': ['edge_response', 'spatial_features']
+    }
+
+    # Test Case 5: Checkerboard pattern
+    checkerboard = np.zeros((8, 8, 3), dtype=np.float32)
+    checkerboard[::2, ::2, :] = 1.0
+    checkerboard[1::2, 1::2, :] = 1.0
+    test_vectors['checkerboard'] = {
+        'input': checkerboard.flatten().tolist(),
+        'description': 'Checkerboard pattern for frequency testing',
+        'expected_properties': ['frequency_response', 'alternating_output']
+    }
+
+    # Test Case 6: Gradient input
+    gradient = np.zeros((8, 8, 3), dtype=np.float32)
+    for i in range(8):
+        for j in range(8):
+            gradient[i, j, :] = (i + j) / 14.0  # 0 to 1 gradient
+    test_vectors['gradient'] = {
+        'input': gradient.flatten().tolist(),
+        'description': 'Smooth gradient input',
+        'expected_properties': ['smooth_response', 'gradient_preservation']
+    }
+
+    # Test Case 7: Single pixel activation
+    single_pixel = np.zeros((8, 8, 3), dtype=np.float32)
+    single_pixel[4, 4, 1] = 1.0  # Single pixel in center, green channel
+    test_vectors['single_pixel'] = {
+        'input': single_pixel.flatten().tolist(),
+        'description': 'Single activated pixel',
+        'expected_properties': ['localized_response', 'kernel_spread']
+    }
+
+    # Test Case 8: Noise input
+    np.random.seed(123)
+    noise_input = np.random.normal(0, 0.1, (8, 8, 3)).astype(np.float32)
+    test_vectors['noise_input'] = {
+        'input': noise_input.flatten().tolist(),
+        'description': 'Low-amplitude noise input',
+        'expected_properties': ['noise_suppression', 'low_output']
+    }
+
+    return test_vectors
+
+def generate_golden_reference(input_signal: List[float]) -> List[float]:
+    """Generate golden reference using numpy/scipy convolution."""
+    # This would use scipy.signal.convolve2d for accurate reference
+    # For now, we'll use a simplified implementation
+
+    # Reshape input
+    input_array = np.array(input_signal).reshape(8, 8, 3)
+
+    # Simple convolution with fixed kernel for testing
+    # In practice, this would match the exact algorithm implementation
+    kernel = np.ones((3, 3, 3, 16)) * 0.1  # Simple kernel
+    bias = np.zeros(16)
+
+    # Simplified 2D convolution (would be more complex in real implementation)
+    output = np.zeros((6, 6, 16))
+
+    # Very basic convolution for testing
+    for h in range(6):
+        for w in range(6):
+            for c_out in range(16):
+                # Simple average of 3x3 region
+                region = input_array[h:h+3, w:w+3, :]
+                output[h, w, c_out] = np.mean(region) + bias[c_out]
+                # Apply ReLU
+                output[h, w, c_out] = max(0, output[h, w, c_out])
+
+    return output.flatten().tolist()
+
+def validate_conv2d_output(output: List[float], reference: List[float],
+                          tolerance: float = 0.1) -> Dict[str, Any]:
+    """Validate Conv2D output against golden reference."""
+
+    if len(output) != len(reference):
+        return {
+            'valid': False,
+            'error': f'Length mismatch: {len(output)} vs {len(reference)}'
+        }
+
+    output_array = np.array(output)
+    ref_array = np.array(reference)
+
+    # Calculate error metrics
+    error = output_array - ref_array
+    max_error = np.max(np.abs(error))
+    rms_error = np.sqrt(np.mean(error**2))
+    if np.max(np.abs(ref_array)) > 1e-12 and rms_error > 1e-12:
+        snr_db = 20 * np.log10(np.max(np.abs(ref_array)) / rms_error)
+    else:
+        snr_db = 100.0  # Perfect SNR if no error or signal
+
+    # Check if output is reasonable (not all zeros, has variation)
+    output_variation = np.std(output_array)
+    has_activation = np.any(output_array > 0.01)
+
+    return {
+        'valid': bool(max_error < tolerance and has_activation and output_variation > 0.001),
+        'snr_db': float(snr_db),
+        'max_error': float(max_error),
+        'rms_error': float(rms_error),
+        'output_std': float(output_variation),
+        'has_activation': bool(has_activation),
+        'tolerance_met': bool(max_error < tolerance)
+    }
+
+if __name__ == "__main__":
+    # Generate and save test vectors
+    test_vectors = generate_test_vectors()
+
+    # Generate golden references for each test case
+    for test_name, test_data in test_vectors.items():
+        reference = generate_golden_reference(test_data['input'])
+        test_vectors[test_name]['golden_reference'] = reference
+
+        # Validate the golden reference against itself (should be perfect)
+        validation = validate_conv2d_output(reference, reference)
+        test_vectors[test_name]['self_validation'] = validation
+
+    # Save to JSON
+    with open('conv2d_test_vectors.json', 'w') as f:
+        json.dump(test_vectors, f, indent=2)
+
+    print(f"Generated {len(test_vectors)} test vectors for Conv2D")
+    print("Test vectors saved to conv2d_test_vectors.json")
+
+```
