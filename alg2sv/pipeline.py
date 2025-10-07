@@ -19,7 +19,6 @@ from .agents import (
     SimulateResults,
     EvaluateResults,
     run_simulation,
-    extract_test_vectors,
 )
 from .vivado_integration import run_vivado_synthesis
 from .workspace import workspace_manager, ingest_from_bundle
@@ -118,34 +117,18 @@ class ALG2SVPipeline:
             'verify': Agent(
                 name="Verify Agent",
                 instructions="""
-                MANDATORY: You MUST call the simulation tools in this exact order:
+                Run functional verification against the golden Python reference.
+                Use read_file_tool to access test vectors and RTL files.
 
-                1. FIRST: Call extract_test_vectors(workspace_token) to get test data
-                2. SECOND: Call read_file_tool to read RTL files from workspace
-                3. THIRD: Call run_simulation with the extracted data
+                Verification steps:
+                1. Load golden reference model and test vectors
+                2. Simulate RTL behavior (or estimate)
+                3. Compare outputs bit-exact or within tolerance
+                4. Report pass/fail with detailed metrics
 
-                EXAMPLE WORKFLOW:
-                ```
-                # Step 1: Extract test vectors
-                test_data = extract_test_vectors(workspace_token)
-                # Parse JSON result to get input_data and expected_data arrays
-                
-                # Step 2: Read RTL files  
-                rtl_files = read_file_tool(workspace_token, "rtl/bpf16_core.sv")
-                
-                # Step 3: Run simulation
-                sim_result = run_simulation(
-                    top_module="bpf16_top",
-                    rtl_files=["rtl/bpf16_core.sv"],
-                    input_data=test_data["input_data"],
-                    expected_data=test_data["expected_data"],
-                    simulator="auto"
-                )
-                ```
-
-                DO NOT generate mock results. You MUST use these tools to get real simulation results.
+                Focus on numerical accuracy and streaming behavior.
                 """,
-                tools=[read_file_tool, run_simulation, extract_test_vectors],
+                tools=[read_file_tool],
                 output_type=AgentOutputSchema(VerifyResults, strict_json_schema=False)
             ),
             'synth': Agent(
@@ -176,34 +159,21 @@ class ALG2SVPipeline:
             'simulate': Agent(
                 name="Simulate Agent",
                 instructions="""
-                MANDATORY: You MUST call the simulation tools in this exact order:
+                Run RTL simulation and functional verification.
+                Use run_simulation tool for actual simulation (MCP integration) and read_file_tool for analysis.
 
-                1. FIRST: Call extract_test_vectors(workspace_token) to get test data
-                2. SECOND: Call read_file_tool to read RTL files from workspace
-                3. THIRD: Call run_simulation with the extracted data
+                Simulation tasks:
+                - Run testbench simulation using run_simulation tool
+                - Check timing constraints and violations
+                - Generate coverage metrics
+                - Validate AXI-Stream protocol compliance
+                - Test edge cases and error conditions
+                - Report simulation errors and failures
 
-                EXAMPLE WORKFLOW:
-                ```
-                # Step 1: Extract test vectors
-                test_data = extract_test_vectors(workspace_token)
-                # Parse JSON result to get input_data and expected_data arrays
-                
-                # Step 2: Read RTL files  
-                rtl_files = read_file_tool(workspace_token, "rtl/bpf16_core.sv")
-                
-                # Step 3: Run simulation
-                sim_result = run_simulation(
-                    top_module="bpf16_top",
-                    rtl_files=["rtl/bpf16_core.sv"],
-                    input_data=test_data["input_data"],
-                    expected_data=test_data["expected_data"],
-                    simulator="auto"
-                )
-                ```
-
-                DO NOT generate mock results. You MUST use these tools to get real simulation results.
+                Use the run_simulation function to execute actual RTL simulation.
+                Analyze results for correctness and identify any issues.
                 """,
-                tools=[read_file_tool, run_simulation, extract_test_vectors],
+                tools=[read_file_tool, run_simulation],
                 output_type=AgentOutputSchema(SimulateResults, strict_json_schema=False)
             ),
             'evaluate': Agent(

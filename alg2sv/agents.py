@@ -9,11 +9,38 @@ import yaml
 import json
 
 from agents import function_tool  # Real OpenAI Agents SDK
-from .workspace import read_source, write_artifact, ingest_from_bundle
+from .workspace import read_source, write_artifact, ingest_from_bundle, workspace_manager
 from .vivado_integration import run_vivado_synthesis
 from .simulator_integration import run_rtl_simulation, generate_testbench
 import json
 import numpy as np
+
+
+@function_tool
+def list_workspace_files(workspace_token: str) -> str:
+    """
+    List all files in the workspace to help agents discover RTL files.
+
+    Args:
+        workspace_token: Workspace identifier
+
+    Returns:
+        JSON string with list of file paths in workspace
+    """
+    try:
+        workspace = workspace_manager.get_workspace(workspace_token)
+        if not workspace:
+            return json.dumps({"error": "Workspace not found", "success": False})
+
+        files = workspace.list_files()
+        return json.dumps({
+            "success": True,
+            "files": files,
+            "rtl_files": [f for f in files if f.endswith('.sv')],
+            "workspace_token": workspace_token
+        })
+    except Exception as e:
+        return json.dumps({"error": f"Failed to list files: {str(e)}", "success": False})
 
 
 @function_tool
