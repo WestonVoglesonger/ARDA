@@ -158,8 +158,9 @@ class ALG2SVPipeline:
                 CRITICAL REQUIREMENTS:
                 1. You MUST call extract_test_vectors(workspace_token) FIRST
                 2. You MUST call list_workspace_files(workspace_token) to find RTL files
-                3. You MUST call run_simulation() with real data
-                4. You MUST return actual simulation results, not estimates
+                3. You MUST derive the top module dynamically from the pipeline results JSON (no hard-coded names)
+                4. You MUST call run_simulation() with real data
+                5. You MUST return actual simulation results, not estimates
 
                 CONSEQUENCES OF NOT USING TOOLS:
                 - Pipeline will be marked as FAILED
@@ -179,9 +180,17 @@ class ALG2SVPipeline:
                 rtl_files = files_data["rtl_files"]
                 print(f"Found RTL files: {rtl_files}")
 
-                # Step 3: Run simulation (MANDATORY)
+                # Step 3: Determine top module from pipeline results (MANDATORY)
+                current_pipeline_results_json = """<paste the pipeline results JSON block from your prompt here>"""
+                pipeline_results = json.loads(current_pipeline_results_json)
+                rtl_info = pipeline_results.get("rtl", {})
+                top_module = rtl_info.get("top_module")
+                if not top_module:
+                    raise ValueError("Top module missing from RTL stage results")
+
+                # Step 4: Run simulation (MANDATORY)
                 sim_result = run_simulation(
-                    top_module="BPF16_AXI_Stream",
+                    top_module=top_module,
                     rtl_files=rtl_files,
                     input_data=test_data["input_data"],
                     expected_data=test_data["expected_data"],
@@ -229,8 +238,9 @@ class ALG2SVPipeline:
                 CRITICAL REQUIREMENTS:
                 1. You MUST call extract_test_vectors(workspace_token) FIRST
                 2. You MUST call list_workspace_files(workspace_token) to find RTL files
-                3. You MUST call run_simulation() with real data
-                4. You MUST return actual simulation results, not estimates
+                3. You MUST derive the top module dynamically from the pipeline results JSON (no hard-coded names)
+                4. You MUST call run_simulation() with real data
+                5. You MUST return actual simulation results, not estimates
 
                 CONSEQUENCES OF NOT USING TOOLS:
                 - Pipeline will be marked as FAILED
@@ -250,9 +260,17 @@ class ALG2SVPipeline:
                 rtl_files = files_data["rtl_files"]
                 print(f"Found RTL files: {rtl_files}")
 
-                # Step 3: Run simulation (MANDATORY)
+                # Step 3: Determine top module from pipeline results (MANDATORY)
+                current_pipeline_results_json = """<paste the pipeline results JSON block from your prompt here>"""
+                pipeline_results = json.loads(current_pipeline_results_json)
+                rtl_info = pipeline_results.get("rtl", {})
+                top_module = rtl_info.get("top_module")
+                if not top_module:
+                    raise ValueError("Top module missing from RTL stage results")
+
+                # Step 4: Run simulation (MANDATORY)
                 sim_result = run_simulation(
-                    top_module="BPF16_AXI_Stream",
+                    top_module=top_module,
                     rtl_files=rtl_files,
                     input_data=test_data["input_data"],
                     expected_data=test_data["expected_data"],
