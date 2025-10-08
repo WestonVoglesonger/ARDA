@@ -79,14 +79,14 @@ cat rtl_output/synth_results.json | jq '.fmax_mhz, .lut_usage, .timing_met'
 ### Expected Results
 
 ```
-✅ spec: Generated hardware contract (100MHz target, Q1.15 fixed-point)
-✅ quant: Applied fixed-point quantization with error analysis
-✅ microarch: Designed 4-stage pipeline with 3 DSPs
-✅ rtl: Generated symmetric FIR with AXI-Stream interfaces
-✅ static_checks: Passed linting (95% quality score)
-✅ verification: 100% functional verification (1024 tests)
-✅ synth: Achieved 102.5MHz (exceeding 100MHz target)
-✅ evaluate: Overall score 94.5%
+spec: Generated hardware contract (100MHz target, Q1.15 fixed-point)
+quant: Applied fixed-point quantization with error analysis
+microarch: Designed 4-stage pipeline with 3 DSPs
+rtl: Generated symmetric FIR with AXI-Stream interfaces
+static_checks: Passed linting (95% quality score)
+verification: 100% functional verification (1024 tests)
+synth: Achieved 102.5MHz (exceeding 100MHz target)
+evaluate: Overall score 94.5%
 ```
 
 ## Advanced DSP Pipeline
@@ -554,9 +554,9 @@ arda production_algorithm.txt \
 
 # Verify deployment readiness
 echo "Deployment checklist:"
-echo "✅ RTL generated: $(ls production_rtl/rtl/ | wc -l) files"
-echo "✅ Timing met: $(cat production_results.json | jq '.synth.timing_met')"
-echo "✅ Resources within budget: $(cat production_results.json | jq '.synth.lut_usage < 20000')"
+echo "RTL generated: $(ls production_rtl/rtl/ | wc -l) files"
+echo "Timing met: $(cat production_results.json | jq '.synth.timing_met')"
+echo "Resources within budget: $(cat production_results.json | jq '.synth.lut_usage < 20000')"
 ```
 
 ### Batch Processing
@@ -580,17 +580,17 @@ find rtl_output/ -name "*.sv" | wc -l | xargs echo "RTL files generated:"
 
 ```
 Pipeline Stages:
-✅ spec: Algorithm analysis complete (5-tap FIR, 100MHz target)
-✅ quant: Fixed-point conversion (Q1.15, SNR=85dB)
-✅ microarch: Pipeline design (4 stages, 3 DSPs)
-✅ rtl: RTL generation complete (symmetric optimization)
-✅ static_checks: Quality verification (95% score)
-✅ verification: Functional testing (100% pass rate)
-✅ synth: FPGA synthesis (102.5MHz achieved)
-✅ evaluate: Performance evaluation (94.5% overall score)
+spec: Algorithm analysis complete (5-tap FIR, 100MHz target)
+quant: Fixed-point conversion (Q1.15, SNR=85dB)
+microarch: Pipeline design (4 stages, 3 DSPs)
+rtl: RTL generation complete (symmetric optimization)
+static_checks: Quality verification (95% score)
+verification: Functional testing (100% pass rate)
+synth: FPGA synthesis (102.5MHz achieved)
+evaluate: Performance evaluation (94.5% overall score)
 
 Hardware Results:
-- Clock frequency: 102.5MHz (target: 100MHz) ✅
+- Clock frequency: 102.5MHz (target: 100MHz)
 - Resource usage: 450 LUTs, 520 FFs, 3 DSPs
 - Power consumption: 120mW
 - Verification: All 1024 test vectors passed
@@ -601,14 +601,14 @@ Hardware Results:
 When synthesis doesn't meet timing targets, ARDA automatically suggests improvements:
 
 ```
-Initial synthesis: 85MHz (target: 100MHz) ❌
+Initial synthesis: 85MHz (target: 100MHz)
 
 Feedback analysis:
 - Increase pipeline depth from 4 to 6 stages
 - Add register balancing for critical paths
 - Optimize DSP placement
 
-Retry synthesis: 105MHz achieved ✅
+Retry synthesis: 105MHz achieved
 
 Final results:
 - Clock frequency: 105MHz (5% over target)

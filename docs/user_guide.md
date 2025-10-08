@@ -216,10 +216,10 @@ arda fir_bundle.txt --verbose --agent-runner openai --extract-rtl rtl_output/
 
 **Results:**
 ```
-✅ RTL generated: 4 different architectural variants
-✅ Synthesis: 102.5MHz achieved (target: 100MHz)
-✅ Verification: 100% pass rate (1024/1024 tests)
-✅ Resources: 450 LUTs, 520 FFs, 3 DSPs
+RTL generated: 4 different architectural variants
+Synthesis: 102.5MHz achieved (target: 100MHz)
+Verification: 100% pass rate (1024/1024 tests)
+Resources: 450 LUTs, 520 FFs, 3 DSPs
 ```
 
 ### Advanced Algorithm Example

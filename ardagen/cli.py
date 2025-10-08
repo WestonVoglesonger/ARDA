@@ -121,10 +121,10 @@ Examples:
         source_path, output_path = args.create_bundle
         try:
             create_bundle(source_path, output_path)
-            print(f"✅ Bundle created successfully: {output_path}")
+            print(f"Bundle created successfully: {output_path}")
             return
         except Exception as e:
-            print(f"❌ Error creating bundle: {e}")
+            print(f"Error creating bundle: {e}")
             return
 
     # Validate arguments
@@ -148,7 +148,7 @@ Examples:
 
         # Run simplified pipeline
         if args.verbose:
-            print("🚀 Starting ARDA pipeline...")
+            print("Starting ARDA pipeline...")
             print(f"Bundle length: {len(algorithm_bundle)} characters")
             print(f"Synthesis backend: {args.synthesis_backend}")
             if args.fpga_family:
@@ -159,11 +159,11 @@ Examples:
         if args.verbose:
             def _trace_emitter(agent_name: str, stage: str, event_type: str, payload: str):
                 symbol = {
-                    "stage_started": "⏳",
-                    "stage_completed": "✅",
-                    "stage_failed": "💥",
-                    "tool_invoked": "🛠️",
-                }.get(event_type, "🔎")
+                    "stage_started": "START",
+                    "stage_completed": "OK",
+                    "stage_failed": "FAIL",
+                    "tool_invoked": "TOOL",
+                }.get(event_type, "INFO")
                 try:
                     details = json.loads(payload)
                     payload_str = ", ".join(f"{k}={v}" for k, v in details.items())
@@ -186,12 +186,12 @@ Examples:
                 try:
                     agent_runner = OpenAIAgentRunner()
                     if args.verbose:
-                        print("🤖 Using OpenAI Agents runtime")
+                        print("Using OpenAI Agents runtime")
                 except Exception as exc:
                     if runner_choice == 'openai':
                         raise
                     if args.verbose:
-                        print(f"⚠️ Falling back to deterministic runner: {exc}")
+                        print(f"Falling back to deterministic runner: {exc}")
 
         if agent_runner is None:
             agent_runner = DefaultAgentRunner()
@@ -209,7 +209,7 @@ Examples:
 
         # Display results
         if result['success']:
-            print("✅ Pipeline completed successfully!")
+            print("Pipeline completed successfully!")
             
             # Extract summary from results
             results = result['results']
@@ -233,7 +233,7 @@ Examples:
             # Check verification status
             eval_result = results.get('evaluate', {})
             overall_score = getattr(eval_result, 'overall_score', 0)
-            verification_status = "✅ Passed" if overall_score >= 70 else "❌ Failed"
+            verification_status = "Passed" if overall_score >= 70 else "Failed"
             print(f"   Verification: {verification_status}")
 
             if args.workspace_info:
@@ -245,7 +245,7 @@ Examples:
                         print(f"   - {file_path} ({len(content) if content else 0} bytes)")
 
         else:
-            print(f"❌ Pipeline failed: {result['error']}")
+            print(f"Pipeline failed: {result['error']}")
             if 'details' in result and result['details']:
                 print("Details:")
                 if isinstance(result['details'], list):
@@ -258,12 +258,12 @@ Examples:
         if args.output:
             with open(args.output, 'w') as f:
                 json.dump(result, f, indent=2)
-            print(f"💾 Results saved to: {args.output}")
+            print(f"Results saved to: {args.output}")
 
         # Extract RTL files
         if args.extract_rtl and result['success']:
             extract_rtl_files(result['workspace_token'], args.extract_rtl)
-            print(f"📤 RTL files extracted to: {args.extract_rtl}")
+            print(f"RTL files extracted to: {args.extract_rtl}")
 
         # Exit with appropriate code
         sys.exit(0 if result['success'] else 1)

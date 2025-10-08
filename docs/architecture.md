@@ -120,6 +120,6 @@ Feedback policies decide when to rerun `Quant`, `MicroArch`, `RTL`, or `Synthesi
 ## Immediate Next Tasks
 1. Publish companion ADR describing staged refactor approach and gain stakeholder approval.
 2. Extract `SpecContract`, `QuantConfig`, etc. into `alg2sv/domain/` module with unit tests.
-3. Prototype `core/stages/base.py` and `core/orchestrator.py`, wiring the current spec → quant → microarch flow as proof of concept. ✅
-4. Set up `observability/manager.py` with event definitions and integrate into the prototype stages. ✅
-5. Update documentation (README + CLI help) to reference the forthcoming staged pipeline and reporting outputs. ⏳
+3. Prototype `core/stages/base.py` and `core/orchestrator.py`, wiring the current spec → quant → microarch flow as proof of concept.
+4. Set up `observability/manager.py` with event definitions and integrate into the prototype stages.
+5. Update documentation (README + CLI help) to reference the forthcoming staged pipeline and reporting outputs.

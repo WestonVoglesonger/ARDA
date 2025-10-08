@@ -58,7 +58,7 @@ class BundleCreator:
         if output_path:
             with open(output_path, 'w', encoding='utf-8') as f:
                 f.write(bundle_content)
-            print(f'✅ Bundle created: {output_path}')
+            print(f'Bundle created: {output_path}')
 
         return bundle_content
 
@@ -111,7 +111,7 @@ class BundleCreator:
         if output_path:
             with open(output_path, 'w', encoding='utf-8') as f:
                 f.write(bundle_content)
-            print(f'✅ Bundle created from {len(python_files)} files: {output_path}')
+            print(f'Bundle created from {len(python_files)} files: {output_path}')
 
         return bundle_content
 

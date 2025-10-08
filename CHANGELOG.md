@@ -29,7 +29,7 @@ All notable changes to ARDA will be documented in this file.
 - Added comprehensive testbench generation with AXI-Stream interfaces
 - Graceful fallback to mock results when simulators unavailable
 
-#### 🔧 Technical Fixes
+#### Technical Fixes
 
 **API Compatibility:**
 - Fixed OpenAI Responses API tool definition format
@@ -46,7 +46,7 @@ All notable changes to ARDA will be documented in this file.
 - Implemented graceful degradation for missing tools
 - Enhanced error recovery and retry mechanisms
 
-#### 📚 Documentation
+#### Documentation
 
 **Complete Documentation Suite:**
 - **User Guide** - Step-by-step usage instructions and examples
@@ -55,27 +55,27 @@ All notable changes to ARDA will be documented in this file.
 - **Troubleshooting Guide** - Common issues and solutions
 - **Examples** - Practical usage patterns and benchmarks
 
-#### 🎯 Results Achieved
+#### Results Achieved
 
 **Successful Pipeline Execution:**
 ```
-✅ spec: Algorithm analysis complete (5-tap FIR, 100MHz target)
-✅ quant: Fixed-point conversion (Q1.15, SNR=85dB)
-✅ microarch: Pipeline design (4 stages, 3 DSPs)
-✅ rtl: RTL generation complete (symmetric optimization)
-✅ static_checks: Quality verification (95% score)
-✅ verification: Functional testing (100% pass rate)
-✅ synth: FPGA synthesis (102.5MHz achieved)
-✅ evaluate: Performance evaluation (94.5% overall score)
+spec: Algorithm analysis complete (5-tap FIR, 100MHz target)
+quant: Fixed-point conversion (Q1.15, SNR=85dB)
+microarch: Pipeline design (4 stages, 3 DSPs)
+rtl: RTL generation complete (symmetric optimization)
+static_checks: Quality verification (95% score)
+verification: Functional testing (100% pass rate)
+synth: FPGA synthesis (102.5MHz achieved)
+evaluate: Performance evaluation (94.5% overall score)
 ```
 
 **Hardware Results:**
-- Clock frequency: 102.5MHz (target: 100MHz) ✅
+- Clock frequency: 102.5MHz (target: 100MHz)
 - Resource usage: 450 LUTs, 520 FFs, 3 DSPs
 - Verification: 100% pass rate (1024 test vectors)
 - Quality score: 94.5%
 
-### 🏗️ Architecture Improvements
+### Architecture Improvements
 
 #### Modular Design
 - **Stage-based architecture** with clear separation of concerns
@@ -94,7 +94,7 @@ All notable changes to ARDA will be documented in this file.
 - **Rich debugging** capabilities with detailed error reporting
 - **Clear contribution guidelines** and development workflow
 
-### 🔄 Migration from v0.9.x
+### Migration from v0.9.x
 
 #### Breaking Changes
 - **OpenAI API integration** now uses Responses API (requires API key)

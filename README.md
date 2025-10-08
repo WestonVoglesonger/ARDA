@@ -1,4 +1,4 @@
-# ARDA: AI-Powered RTL Generation from Python Algorithms 🚀
+# ARDA: AI-Powered RTL Generation from Python Algorithms
 
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -6,9 +6,9 @@
 
 **ARDA (Automated RTL Design Agents)** is a groundbreaking AI system that automatically converts Python algorithms into production-quality SystemVerilog RTL for FPGA implementation. Powered by OpenAI's Agents SDK, ARDA uses specialized AI agents to transform streaming algorithms through an intelligent, multi-stage pipeline.
 
-🎯 **Breakthrough Achievement**: Successfully generates synthesizable RTL that achieves target clock frequencies (102.5MHz vs 100MHz target) with 100% functional verification.
+**Breakthrough Achievement**: Successfully generates synthesizable RTL that achieves target clock frequencies (102.5MHz vs 100MHz target) with 100% functional verification.
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Installation
 
@@ -38,15 +38,15 @@ arda algorithm_bundle.txt --extract-rtl rtl_output/
 
 **Example Results:**
 ```
-✅ Pipeline completed successfully!
+Pipeline completed successfully!
    Algorithm: FIR5_Symmetric_5tap_FPGA
    Target: 100.0MHz
    Achieved: 102.5MHz
    Resources: 450 LUTs, 520 FFs, 3 DSPs
-   Verification: ✅ Passed
+   Verification: Passed
 ```
 
-## 📚 Documentation
+## Documentation
 
 - **[User Guide](docs/user_guide.md)** - Complete guide for using ARDA
 - **[Developer Guide](docs/developer_guide.md)** - For contributors and advanced users
@@ -77,23 +77,23 @@ Behind the scenes the orchestrator pulls agents from `alg2sv/agents/registry.py`
 5. **Verify Agent**: Runs functional verification against golden reference
 6. **Synth Agent**: Synthesizes design and reports timing/area metrics
 
-## ⚠️ Current Limitations
+## Current Limitations
 
 **CRITICAL: ARDA generates RTL but does NOT perform real hardware verification!**
 
 ### What ARDA Currently Does:
-- ✅ Generates synthesizable SystemVerilog RTL
-- ✅ Performs software-based functional verification
-- ✅ Estimates synthesis results (timing, area)
-- ✅ Lints and analyzes code quality
-- ✅ Validates against golden reference models
+- Generates synthesizable SystemVerilog RTL
+- Performs software-based functional verification
+- Estimates synthesis results (timing, area)
+- Lints and analyzes code quality
+- Validates against golden reference models
 
 ### What ARDA Does NOT Do (Without Vivado):
-- ❌ **Real FPGA synthesis** (requires Vivado installation)
-- ❌ **Bitstream generation** (requires Vivado for .bit files)
-- ❌ **Hardware programming** (requires JTAG/FPGA board)
-- ❌ **Actual FPGA testing** (requires hardware setup)
-- ❌ **PCIe/DMA data transfer** (requires board-specific drivers)
+- **Real FPGA synthesis** (requires Vivado installation)
+- **Bitstream generation** (requires Vivado for .bit files)
+- **Hardware programming** (requires JTAG/FPGA board)
+- **Actual FPGA testing** (requires hardware setup)
+- **PCIe/DMA data transfer** (requires board-specific drivers)
 
 ### True Hardware Verification Requires:
 1. **Synthesis Tool Integration** (Vivado CLI, Quartus)
@@ -103,7 +103,7 @@ Behind the scenes the orchestrator pulls agents from `alg2sv/agents/registry.py`
 
 **Bottom Line**: ARDA is currently a **software-based RTL generation and estimation tool**. For production use, the generated RTL must be synthesized and tested on actual FPGA hardware separately.
 
-## 🛠️ Vivado Integration (Real Hardware Synthesis)
+## Vivado Integration (Real Hardware Synthesis)
 
 ARDA now includes **optional Vivado CLI integration** for real FPGA synthesis and bitstream generation!
 
@@ -133,12 +133,12 @@ ARDA now includes **optional Vivado CLI integration** for real FPGA synthesis an
 
 When Vivado is available, ARDA can perform:
 
-- ✅ **Real FPGA Synthesis** (not estimation)
-- ✅ **Actual Implementation** with place & route
-- ✅ **Bitstream Generation** (.bit files)
-- ✅ **Accurate Resource Usage** (LUTs, FFs, DSPs, BRAM)
-- ✅ **Real Timing Analysis** (WNS, TNS, slack)
-- ✅ **Power Analysis** (when available)
+- **Real FPGA Synthesis** (not estimation)
+- **Actual Implementation** with place & route
+- **Bitstream Generation** (.bit files)
+- **Accurate Resource Usage** (LUTs, FFs, DSPs, BRAM)
+- **Real Timing Analysis** (WNS, TNS, slack)
+- **Power Analysis** (when available)
 
 ### Testing Vivado Integration
 
@@ -371,35 +371,35 @@ arda test_algorithms/bpf16_bundle.txt \
 
 ### Expected Test Results
 
-✅ **Successful Run:**
+**Successful Run:**
 - Pipeline completes all 6 stages
 - Generates SystemVerilog files
 - Verification passes (100% match)
 - Synthesis meets timing/area constraints
 
-📊 **Sample Output:**
+**Sample Output:**
 ```
-📥 Ingesting algorithm bundle...
-✅ Created workspace with 3 files
-🔍 Running Spec Agent...
-✅ Spec: BPF16 - 200MHz target
-🔢 Running Quant Agent...
-✅ Quant: 16 coeffs, error=1.23e-06
-🏗️ Running MicroArch Agent...
-✅ MicroArch: 4 stages, 16 DSPs
-💾 Running RTL Agent...
-✅ RTL: Generated 2 files, top=bpf16_top
-✅ Running Verify Agent...
-✅ Verify: 1024/1024 tests passed
-🔨 Running Synth Agent...
-🎉 Pipeline completed successfully!
+Ingesting algorithm bundle...
+Created workspace with 3 files
+Running Spec Agent...
+Spec: BPF16 - 200MHz target
+Running Quant Agent...
+Quant: 16 coeffs, error=1.23e-06
+Running MicroArch Agent...
+MicroArch: 4 stages, 16 DSPs
+Running RTL Agent...
+RTL: Generated 2 files, top=bpf16_top
+Running Verify Agent...
+Verify: 1024/1024 tests passed
+Running Synth Agent...
+Pipeline completed successfully!
    Target: 200.0MHz, Achieved: 198.5MHz
    Resources: 1847 LUTs, 3201 FFs, 16 DSPs
 ```
 
 ### Troubleshooting Tests
 
-**❌ Agent Import Errors:**
+**Agent Import Errors:**
 ```bash
 # Check OpenAI Agents SDK installation
 pip show openai-agents
@@ -408,7 +408,7 @@ pip show openai-agents
 echo $OPENAI_API_KEY
 ```
 
-**❌ Bundle Parsing Issues:**
+**Bundle Parsing Issues:**
 ```bash
 # Test bundle parsing
 python -c "
@@ -418,7 +418,7 @@ print('Parsed successfully' if result['success'] else result['error'])
 "
 ```
 
-**❌ API Rate Limits:**
+**API Rate Limits:**
 - The pipeline makes multiple OpenAI API calls
 - Monitor usage in OpenAI dashboard
 - Consider adding delays between agent calls
