@@ -1,5 +1,5 @@
 """
-Virtual Workspace Management for ALG2SV Pipeline
+Virtual Workspace Management for the ARDA Pipeline
 Handles algorithm bundles and generated artifacts in memory.
 """
 
@@ -21,11 +21,17 @@ class Workspace:
     def __init__(self):
         self.files: Dict[str, str] = {}
         self.metadata: Dict[str, Any] = {}
+        self.algorithm_info: Dict[str, Any] = {}  # Store algorithm metadata
 
     def add_file(self, path: str, content: str) -> None:
         """Add or update a file in the workspace."""
         normalized_path = self._normalize_path(path)
         self.files[normalized_path] = content
+
+    @staticmethod
+    def _normalize_path(path: str) -> str:
+        """Normalize file paths."""
+        return path.replace("\\", "/").strip()
 
     def get_file(self, path: str) -> Optional[str]:
         """Get file content by path."""
@@ -41,10 +47,18 @@ class Workspace:
         normalized_path = self._normalize_path(path)
         return normalized_path in self.files
 
-    @staticmethod
-    def _normalize_path(path: str) -> str:
-        """Normalize file paths."""
-        return path.replace("\\", "/").strip()
+    def get_metadata(self) -> Dict[str, Any]:
+        """Get algorithm metadata."""
+        return self.algorithm_info.copy()
+
+    def set_algorithm_info(self, algorithm_name: str, algorithm_dir: str, vectors_path: str, meta_path: str) -> None:
+        """Set algorithm information."""
+        self.algorithm_info = {
+            "name": algorithm_name,
+            "directory": algorithm_dir,
+            "vectors_path": vectors_path,
+            "meta_path": meta_path
+        }
 
 
 class WorkspaceManager:
@@ -89,6 +103,11 @@ class WorkspaceManager:
         workspace_id = self.create_workspace()
         workspace = self.get_workspace(workspace_id)
 
+        # Track algorithm files for metadata extraction
+        vectors_files = []
+        meta_files = []
+        algo_files = []
+
         for match in re.finditer(file_block_pattern, raw_bundle):
             path = match.group(1).strip()
             content = match.group(2).rstrip()
@@ -101,7 +120,77 @@ class WorkspaceManager:
 
             workspace.add_file(path, content)
 
+            # Track algorithm-related files
+            if path.endswith('vectors.py'):
+                vectors_files.append(path)
+            elif path.endswith('meta.yaml'):
+                meta_files.append(path)
+            elif path.endswith('algo.py'):
+                algo_files.append(path)
+
+        # Extract algorithm metadata
+        self._extract_algorithm_metadata(workspace, vectors_files, meta_files, algo_files)
+
         return workspace_id
+
+    def _extract_algorithm_metadata(self, workspace: 'Workspace', vectors_files: List[str], 
+                                   meta_files: List[str], algo_files: List[str]) -> None:
+        """Extract algorithm metadata from bundle files."""
+        if not vectors_files:
+            return
+
+        # Use the first vectors.py file found
+        vectors_path = vectors_files[0]
+        vectors_dir = self._get_directory_from_path(vectors_path)
+        
+        # Find corresponding meta.yaml
+        meta_path = None
+        for meta_file in meta_files:
+            if self._get_directory_from_path(meta_file) == vectors_dir:
+                meta_path = meta_file
+                break
+
+        # Find corresponding algo.py
+        algo_path = None
+        for algo_file in algo_files:
+            if self._get_directory_from_path(algo_file) == vectors_dir:
+                algo_path = algo_file
+                break
+
+        # Extract algorithm name from meta.yaml if available
+        algorithm_name = "unknown"
+        if meta_path and meta_path in workspace.files:
+            try:
+                import yaml
+                meta_content = workspace.files[meta_path]
+                meta_data = yaml.safe_load(meta_content)
+                if isinstance(meta_data, dict):
+                    # Try different possible keys for algorithm name
+                    algorithm_name = (meta_data.get('name') or 
+                                   meta_data.get('algorithm', {}).get('name') or
+                                   meta_data.get('algorithm_name') or
+                                   vectors_dir.split('/')[-1] if '/' in vectors_dir else vectors_dir)
+            except Exception:
+                # Fallback to directory name
+                algorithm_name = vectors_dir.split('/')[-1] if '/' in vectors_dir else vectors_dir
+
+        # Store algorithm info
+        workspace.set_algorithm_info(
+            algorithm_name=algorithm_name,
+            algorithm_dir=vectors_dir,
+            vectors_path=vectors_path,
+            meta_path=meta_path or ""
+        )
+
+    @staticmethod
+    def _get_directory_from_path(path: str) -> str:
+        """Extract directory from file path."""
+        if '/' in path:
+            return '/'.join(path.split('/')[:-1])
+        elif '\\' in path:
+            return '\\'.join(path.split('\\')[:-1])
+        else:
+            return ""
 
 
 # Global workspace manager instance

@@ -2,7 +2,7 @@ algorithm:
   name: "Conv2D"
   description: "2D Convolutional Neural Network Layer with ReLU activation and fixed-point arithmetic"
   version: "1.0"
-  author: "ALG2SV Pipeline"
+  author: "ARDA Pipeline"
   license: "MIT"
 
 interface:

@@ -1,13 +1,25 @@
-# ALG2SV: Algorithm to SystemVerilog Pipeline
+# ARDA: Automated RTL Design with Agents
+> Formerly known as ALG2SV
 
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-A sophisticated multi-agent AI system that automatically converts Python algorithms into synthesizable SystemVerilog RTL for FPGA implementation. Built with OpenAI's Agents SDK, ALG2SV transforms streaming algorithms through a structured pipeline of specialized AI agents.
+A sophisticated multi-agent AI system that automatically converts Python algorithms into synthesizable SystemVerilog RTL for FPGA implementation. Built with OpenAI's Agents SDK, ARDA transforms streaming algorithms through a structured pipeline of specialized AI agents. The runtime currently ships under the legacy `alg2sv` package with a forward-looking `arda` namespace shim for early adopters.
 
 ## Overview
 
 This system takes a Python algorithm as input and guides it through a complete hardware design pipeline:
+
+- `SpecStage` → Generate a hardware contract from the bundle
+- `QuantStage` → Derive fixed-point formats and error budgets
+- `MicroArchStage` → Choose pipeline depth, unrolling, and buffers
+- `RTLStage` → Emit synthesizable SystemVerilog artifacts
+- `StaticChecksStage` → Run lint/style/structural analysis
+- `VerificationStage` → Execute simulation-driven verification and coverage analysis
+- `SynthStage` → Launch backend synthesis (Vivado/Yosys/etc.)
+- `EvaluateStage` → Aggregate reports into a scorecard for feedback
+
+Behind the scenes the orchestrator pulls agents from `alg2sv/agents/registry.py`, which can be swapped out in `alg2sv/runtime/agent_runner.py` to integrate real LLM- or tool-backed flows. Deterministic tool adapters live under `alg2sv/tools/` providing default lint, simulation, synthesis, and reporting stubs.
 
 1. **Spec Agent**: Analyzes algorithm and generates hardware contract
 2. **Quant Agent**: Converts to fixed-point arithmetic with error analysis
@@ -18,16 +30,16 @@ This system takes a Python algorithm as input and guides it through a complete h
 
 ## ⚠️ Current Limitations
 
-**CRITICAL: ALG2SV generates RTL but does NOT perform real hardware verification!**
+**CRITICAL: ARDA generates RTL but does NOT perform real hardware verification!**
 
-### What ALG2SV Currently Does:
+### What ARDA Currently Does:
 - ✅ Generates synthesizable SystemVerilog RTL
 - ✅ Performs software-based functional verification
 - ✅ Estimates synthesis results (timing, area)
 - ✅ Lints and analyzes code quality
 - ✅ Validates against golden reference models
 
-### What ALG2SV Does NOT Do (Without Vivado):
+### What ARDA Does NOT Do (Without Vivado):
 - ❌ **Real FPGA synthesis** (requires Vivado installation)
 - ❌ **Bitstream generation** (requires Vivado for .bit files)
 - ❌ **Hardware programming** (requires JTAG/FPGA board)
@@ -40,11 +52,11 @@ This system takes a Python algorithm as input and guides it through a complete h
 3. **Hardware Test Infrastructure** (PCIe, DMA, JTAG)
 4. **Real-time Data Transfer** (hardware vs software comparison)
 
-**Bottom Line**: ALG2SV is currently a **software-based RTL generation and estimation tool**. For production use, the generated RTL must be synthesized and tested on actual FPGA hardware separately.
+**Bottom Line**: ARDA is currently a **software-based RTL generation and estimation tool**. For production use, the generated RTL must be synthesized and tested on actual FPGA hardware separately.
 
 ## 🛠️ Vivado Integration (Real Hardware Synthesis)
 
-ALG2SV now includes **optional Vivado CLI integration** for real FPGA synthesis and bitstream generation!
+ARDA now includes **optional Vivado CLI integration** for real FPGA synthesis and bitstream generation!
 
 ### Prerequisites
 
@@ -70,7 +82,7 @@ ALG2SV now includes **optional Vivado CLI integration** for real FPGA synthesis 
 
 ### Vivado-Enabled Features
 
-When Vivado is available, ALG2SV can perform:
+When Vivado is available, ARDA can perform:
 
 - ✅ **Real FPGA Synthesis** (not estimation)
 - ✅ **Actual Implementation** with place & route
@@ -89,11 +101,30 @@ python test_vivado_integration.py
 python run_pipeline.py test_algorithms/conv2d_bundle.txt
 ```
 
+### Default Target FPGA
+
+**Xilinx Nexys 7 Board**
+- **FPGA**: Artix-7 XC7A100T-1CSG324C
+- **LUTs**: 63,400
+- **Flip-Flops**: 126,800  
+- **DSP Slices**: 240
+- **Block RAM**: 4.9 Mb
+- **Max Frequency**: 450 MHz (450 MHz for simple designs, 200-300 MHz typical)
+
 ### Supported FPGA Families
 
-- **Xilinx 7 Series**: Artix-7, Kintex-7, Virtex-7
-- **Xilinx UltraScale**: Kintex UltraScale, Virtex UltraScale
-- **Xilinx Zynq**: Zynq-7000, Zynq UltraScale+
+- **Xilinx Artix-7** (Nexys 7, Basys 3) - **Recommended for DSP designs**
+- **Xilinx Kintex-7** - High-performance applications
+- **Xilinx Virtex-7** - Maximum performance
+- **Xilinx UltraScale** - Kintex UltraScale, Virtex UltraScale
+- **Xilinx Zynq** - Zynq-7000, Zynq UltraScale+
+- **iCE40 HX/UP** - Limited support (no DSPs, max ~50 MHz)
+
+### Device Selection Guidelines
+- **For DSP-heavy designs**: Use Xilinx Artix-7 or Kintex-7
+- **For simple logic**: iCE40 is sufficient but frequency-limited
+- **For 200+ MHz targets**: Xilinx devices recommended
+- **For prototyping**: Nexys 7 (XC7A100T) provides excellent balance
 
 ### Vivado Integration Architecture
 
@@ -106,7 +137,7 @@ Algorithm → RTL → Vivado TCL Script → Synthesis → Implementation → Bit
 
 ### TCL Script Generation
 
-ALG2SV automatically generates comprehensive TCL scripts that:
+ARDA automatically generates comprehensive TCL scripts that:
 
 1. Create Vivado projects
 2. Add RTL sources and constraints
@@ -117,7 +148,7 @@ ALG2SV automatically generates comprehensive TCL scripts that:
 
 ### Hardware Verification Pipeline
 
-With Vivado integration, ALG2SV becomes a **complete hardware development platform**:
+With Vivado integration, ARDA becomes a **complete hardware development platform**:
 
 ```
 Algorithm → RTL Generation → Synthesis → Bitstream → FPGA Programming → Testing
@@ -143,8 +174,8 @@ Algorithm → RTL Generation → Synthesis → Bitstream → FPGA Programming �
 
 ```bash
 # Clone the repository
-git clone https://github.com/WestonVoglesonger/alg2sv.git
-cd alg2sv
+git clone https://github.com/WestonVoglesonger/arda.git
+cd arda
 
 # Install in development mode (recommended for contributors)
 pip install -e .
@@ -159,27 +190,27 @@ export OPENAI_API_KEY="your-openai-api-key-here"
 
 ### 3. Choose Synthesis Backend
 
-ALG2SV supports multiple FPGA synthesis backends:
+ARDA supports multiple FPGA synthesis backends (legacy `alg2sv` CLI remains available):
 
 ```bash
 # Auto-detect best available backend
-alg2sv examples/bpf16_bundle.txt --synthesis-backend auto
+arda examples/bpf16_bundle.txt --synthesis-backend auto
 
 # Xilinx Vivado (for Xilinx 7-series FPGAs)
-alg2sv examples/bpf16_bundle.txt --synthesis-backend vivado --fpga-family xc7a100t
+arda examples/bpf16_bundle.txt --synthesis-backend vivado --fpga-family xc7a100t
 
 # Open-source Yosys (for iCE40/ECP5 FPGAs)
-alg2sv examples/bpf16_bundle.txt --synthesis-backend yosys --fpga-family ice40hx8k
+arda examples/bpf16_bundle.txt --synthesis-backend yosys --fpga-family ice40hx8k
 
 # Experimental SymbiFlow (for Xilinx 7-series)
-alg2sv examples/bpf16_bundle.txt --synthesis-backend symbiflow --fpga-family xc7a100t
+arda examples/bpf16_bundle.txt --synthesis-backend symbiflow --fpga-family xc7a100t
 ```
 
 ### 4. Test with Example Algorithm
 
 ```bash
 # Run the BPF16 filter example
-alg2sv examples/bpf16_bundle.txt --verbose --workspace-info
+arda examples/bpf16_bundle.txt --verbose --workspace-info
 
 # Or use the module directly
 python -m alg2sv.cli examples/bpf16_bundle.txt --verbose
@@ -224,15 +255,17 @@ verify:
 
 ```bash
 # Run with your own bundle file
-alg2sv my_algorithm_bundle.txt --output results.json --extract-rtl rtl_output/
+arda my_algorithm_bundle.txt --output results.json --extract-rtl rtl_output/
 
 # Run with inline bundle
-alg2sv --bundle "$(cat my_algorithm_bundle.txt)" --verbose
+arda --bundle "$(cat my_algorithm_bundle.txt)" --verbose --agent-runner auto
 ```
 
 ### 7. Testing the Pipeline
 
 ### Automated Testing
+
+> **Note:** Python import paths currently remain under the `alg2sv` namespace until the package rename milestone lands.
 
 ```bash
 # Run the complete pipeline test
@@ -240,10 +273,14 @@ python -m pytest tests/ -v
 
 # Or run individual components
 python -c "
-from alg2sv.pipeline import run_pipeline_sync
+from alg2sv.simplified_pipeline import SimplifiedPipeline
+from alg2sv.runtime import DefaultAgentRunner
+from alg2sv.agents import create_default_registry
 from alg2sv.test_algorithms.bpf16_bundle import get_bundle
 
-result = run_pipeline_sync(get_bundle())
+runner = DefaultAgentRunner(create_default_registry())
+pipeline = SimplifiedPipeline(agent_runner=runner)
+result = await pipeline.run(bundle_data)
 print('Success!' if result['success'] else 'Failed!')
 "
 ```
@@ -265,18 +302,18 @@ print(f"Workspace: {result['workspace_token']}")
 
 2. **Test Individual Agents:**
 ```python
-from alg2sv.agents import SpecAgent
-from alg2sv.workspace import ingest_from_bundle
+from alg2sv.agents import create_default_registry
 
-# Create agent and test
-agent = SpecAgent()
-# ... test agent functionality
+registry = create_default_registry()
+spec_agent = registry.get_stage_agent("spec")
+spec_result = await spec_agent({"bundle": "...", "observability": None})
+print(spec_result)
 ```
 
 ### End-to-End Pipeline Test
 ```bash
 # Full pipeline with verbose output
-alg2sv test_algorithms/bpf16_bundle.txt \
+arda test_algorithms/bpf16_bundle.txt \
   --verbose \
   --workspace-info \
   --output test_results.json \
@@ -397,6 +434,13 @@ For synthesis (optional but recommended):
 2. Configure `submit_synth_job` and `fetch_synth_results` functions
 3. Supports Yosys, Vivado, or other synthesis tools
 
+### OpenAI Agents Runtime
+
+1. Install the latest OpenAI Python SDK: `pip install openai`
+2. Export `OPENAI_API_KEY`
+3. Run the CLI with `--agent-runner openai` (or rely on `--agent-runner auto` with the key set)
+4. Agents, prompts, and tool schemas are defined in `agent_configs.json`
+
 ## Configuration
 
 ### Agent Instructions
@@ -453,7 +497,7 @@ All agents emit JSON with defined schemas:
 ## Files Structure
 
 ```
-/Users/westonvoglesonger/ALG2SV/
+/Users/westonvoglesonger/Projects/ARDA/
 ├── agent_configs.json          # Agent configurations for Agent Builder
 ├── tools/                      # Local Function tool implementations
 │   ├── ingest_from_bundle.js

@@ -199,7 +199,7 @@ def conv2d_fixed_point(input_fm: np.ndarray, weights: np.ndarray, bias: np.ndarr
 
 def conv2d_step_function(input_data: List[float], config: dict) -> List[float]:
     """
-    Conv2D processing function for ALG2SV pipeline.
+    Conv2D processing function for ARDA pipeline.
 
     Args:
         input_data: Flattened input feature map (8x8x3 = 192 elements)

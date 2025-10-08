@@ -3,16 +3,15 @@ from collections import defaultdict, deque
 
 import pytest
 
-from alg2sv.pipeline import ALG2SVPipeline
-from alg2sv.agents import (
+from alg2sv.simplified_pipeline import SimplifiedPipeline
+from alg2sv.domain import (
     SpecContract,
     QuantConfig,
     MicroArchConfig,
     RTLConfig,
-    VerifyResults,
     SynthResults,
     LintResults,
-    SimulateResults,
+    VerifyResults,
     EvaluateResults,
     FeedbackDecision,
 )
@@ -68,17 +67,6 @@ def _default_stage_outputs():
                 estimated_resources={"lut": 1200, "ff": 2400, "dsp": 8},
             )
         ]),
-        'verify': deque([
-            VerifyResults(
-                tests_total=20,
-                tests_passed=20,
-                all_passed=True,
-                mismatches=[],
-                max_abs_error=1.0e-6,
-                rms_error=5.0e-7,
-                functional_coverage=0.95,
-            )
-        ]),
         'synth': deque([
             SynthResults(
                 fmax_mhz=150.0,
@@ -103,7 +91,7 @@ def _default_stage_outputs():
                 reports_path="synth/run2",
             ),
         ]),
-        'lint': deque([
+        'static_checks': deque([
             LintResults(
                 syntax_errors=0,
                 style_warnings=1,
@@ -114,16 +102,15 @@ def _default_stage_outputs():
                 lint_clean=True,
             )
         ]),
-        'simulate': deque([
-            SimulateResults(
-                test_passed=10,
-                test_failed=0,
-                test_total=10,
-                coverage_percent=98.0,
-                timing_violations=0,
-                simulation_errors=[],
-                waveform_available=True,
-                simulation_time_ms=12.5,
+        'verification': deque([
+            VerifyResults(
+                tests_total=20,
+                tests_passed=20,
+                all_passed=True,
+                mismatches=[],
+                max_abs_error=1.0e-6,
+                rms_error=5.0e-7,
+                functional_coverage=0.95,
             )
         ]),
         'evaluate': deque([
@@ -142,9 +129,10 @@ def _default_stage_outputs():
 
 
 def test_pipeline_retries_synth(monkeypatch):
-    pipeline = ALG2SVPipeline()
+    pipeline = SimplifiedPipeline()
     stage_outputs = _default_stage_outputs()
     feedback_decisions = deque([
+        {"action": "continue"},
         {"action": "continue"},
         {"action": "continue"},
         {"action": "continue"},
@@ -174,7 +162,7 @@ def test_pipeline_retries_synth(monkeypatch):
             result = outputs[0]
         return result
 
-    monkeypatch.setattr(ALG2SVPipeline, "_run_agent_with_context", fake_run, raising=False)
+    monkeypatch.setattr(SimplifiedPipeline, "_run_agent_with_context", fake_run, raising=False)
 
     result = asyncio.run(pipeline.run(_sample_bundle()))
 
@@ -182,17 +170,17 @@ def test_pipeline_retries_synth(monkeypatch):
     assert pipeline.stage_attempts['synth'] == 2
     assert stage_calls['synth'] == 2
     assert pipeline.results['synth'].timing_met is True
-    assert pipeline.results['lint'].overall_score == 95.0
+    assert pipeline.results['static_checks'].overall_score == 95.0
 
 
 def test_pipeline_feedback_abort(monkeypatch):
-    pipeline = ALG2SVPipeline()
+    pipeline = SimplifiedPipeline()
     stage_outputs = _default_stage_outputs()
-    # Modify verification to fail so that feedback aborts after verify stage
-    stage_outputs['verify'] = deque([
+    # Modify verification to fail so that feedback aborts after verification stage
+    stage_outputs['verification'] = deque([
         VerifyResults(
-            tests_total=20,
-            tests_passed=10,
+            tests_total=10,
+            tests_passed=5,
             all_passed=False,
             mismatches=[{"index": 3, "expected": 1.0, "actual": 0.0}],
             max_abs_error=0.1,
@@ -202,6 +190,7 @@ def test_pipeline_feedback_abort(monkeypatch):
     ])
 
     feedback_decisions = deque([
+        {"action": "continue"},
         {"action": "continue"},
         {"action": "continue"},
         {"action": "continue"},
@@ -226,12 +215,12 @@ def test_pipeline_feedback_abort(monkeypatch):
             result = outputs[0]
         return result
 
-    monkeypatch.setattr(ALG2SVPipeline, "_run_agent_with_context", fake_run, raising=False)
+    monkeypatch.setattr(SimplifiedPipeline, "_run_agent_with_context", fake_run, raising=False)
 
     result = asyncio.run(pipeline.run(_sample_bundle()))
 
     assert result["success"] is False
     assert result["error"] == "Pipeline aborted by feedback agent"
     assert 'synth' not in pipeline.results
-    assert pipeline.stage_attempts['verify'] == 1
-    assert stage_calls['verify'] == 1
+    assert pipeline.stage_attempts['verification'] == 1
+    assert stage_calls['verification'] == 1

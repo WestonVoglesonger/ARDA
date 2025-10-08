@@ -3,13 +3,13 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "alg2sv"
+name = "arda"
 version = "0.1.0"
-description = "Convert Python algorithms to SystemVerilog RTL using AI agents"
+description = "ARDA: Automated RTL Design with Agents for SystemVerilog generation"
 readme = "README.md"
 license = {text = "MIT"}
 authors = [
-    {name = "ALG2SV Team"},
+    {name = "ARDA Team"},
 ]
 keywords = [
     "fpga",
@@ -45,11 +45,12 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/your-repo/alg2sv"
-Repository = "https://github.com/your-repo/alg2sv"
-Documentation = "https://github.com/your-repo/alg2sv#readme"
+Homepage = "https://github.com/your-repo/arda"
+Repository = "https://github.com/your-repo/arda"
+Documentation = "https://github.com/your-repo/arda#readme"
 
 [project.scripts]
+arda = "alg2sv.cli:main"
 alg2sv = "alg2sv.cli:main"
 
 [tool.setuptools]
@@ -57,7 +58,7 @@ include-package-data = true
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["alg2sv*"]
+include = ["alg2sv*", "arda*"]
 exclude = ["tests*", "test_*", "*.tests*", "*.tests.*"]
 
 # Black code formatting

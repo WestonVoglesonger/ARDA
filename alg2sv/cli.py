@@ -1,5 +1,5 @@
 """
-Command-line interface for ALG2SV pipeline.
+Command-line interface for the ARDA pipeline.
 """
 
 import argparse
@@ -8,34 +8,50 @@ import sys
 from pathlib import Path
 from typing import Optional
 
-from .pipeline import run_pipeline_sync, load_bundle_from_file
+from .simplified_pipeline import SimplifiedPipeline
 from .workspace import workspace_manager
+from .runtime import DefaultAgentRunner
+from .observability.manager import ObservabilityManager
+
+try:
+    from .agents.openai_runner import OpenAIAgentRunner
+except Exception:  # pragma: no cover - resolved at runtime when requested
+    OpenAIAgentRunner = None
 
 
 def main():
     """Main CLI entry point."""
     parser = argparse.ArgumentParser(
-        description="ALG2SV: Convert Python algorithms to SystemVerilog RTL",
+        description="ARDA (Automated RTL Design with Agents): Convert Python algorithms to SystemVerilog RTL",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
+  # Create bundle from Python file
+  arda --create-bundle my_algorithm.py my_bundle.txt
+
+  # Create bundle from directory
+  arda --create-bundle my_project/ project_bundle.txt
+
   # Run with algorithm bundle file
-  alg2sv test_algorithms/bpf16_bundle.txt
+  arda test_algorithms/bpf16_bundle.txt
 
   # Run with Vivado synthesis for Xilinx FPGAs
-  alg2sv test_algorithms/bpf16_bundle.txt --synthesis-backend vivado --fpga-family xc7a100t
+  arda test_algorithms/bpf16_bundle.txt --synthesis-backend vivado --fpga-family xc7a100t
 
   # Run with open-source Yosys for iCE40 FPGAs
-  alg2sv test_algorithms/bpf16_bundle.txt --synthesis-backend yosys --fpga-family ice40hx8k
+  arda test_algorithms/bpf16_bundle.txt --synthesis-backend yosys --fpga-family ice40hx8k
 
   # Auto-detect best synthesis backend
-  alg2sv test_algorithms/bpf16_bundle.txt --synthesis-backend auto
+  arda test_algorithms/bpf16_bundle.txt --synthesis-backend auto
 
   # Save results to JSON file
-  alg2sv test_algorithms/bpf16_bundle.txt --output results.json
+  arda test_algorithms/bpf16_bundle.txt --output results.json
 
   # Extract generated RTL files
-  alg2sv test_algorithms/bpf16_bundle.txt --extract-rtl output_dir/
+  arda test_algorithms/bpf16_bundle.txt --extract-rtl output_dir/
+
+  # Legacy CLI (supported for compatibility)
+  alg2sv test_algorithms/bpf16_bundle.txt
         """
     )
 
@@ -61,6 +77,13 @@ Examples:
     )
 
     parser.add_argument(
+        '--create-bundle', '-c',
+        nargs=2,
+        metavar=('SOURCE', 'OUTPUT'),
+        help='Create bundle from Python file or directory'
+    )
+
+    parser.add_argument(
         '--workspace-info', '-w',
         help='Show workspace information after run'
     )
@@ -83,7 +106,26 @@ Examples:
         help='FPGA family for synthesis (e.g., xc7a100t, ice40hx8k, ecp5)'
     )
 
+    parser.add_argument(
+        '--agent-runner',
+        choices=['auto', 'default', 'openai'],
+        default='auto',
+        help='Select which agent runner implementation to use (default: auto)',
+    )
+
     args = parser.parse_args()
+
+    # Handle bundle creation
+    if args.create_bundle:
+        from .bundle_utils import create_bundle
+        source_path, output_path = args.create_bundle
+        try:
+            create_bundle(source_path, output_path)
+            print(f"✅ Bundle created successfully: {output_path}")
+            return
+        except Exception as e:
+            print(f"❌ Error creating bundle: {e}")
+            return
 
     # Validate arguments
     if not args.bundle_file and not args.bundle:
@@ -97,37 +139,102 @@ Examples:
         if args.bundle_file:
             if args.verbose:
                 print(f"📁 Loading bundle from file: {args.bundle_file}")
-            algorithm_bundle = load_bundle_from_file(args.bundle_file)
+            with open(args.bundle_file, 'r') as f:
+                algorithm_bundle = f.read()
         else:
             if args.verbose:
                 print("📄 Using inline bundle string")
             algorithm_bundle = args.bundle
 
-        # Run pipeline
+        # Run simplified pipeline
         if args.verbose:
-            print("🚀 Starting ALG2SV pipeline...")
+            print("🚀 Starting ARDA pipeline...")
             print(f"Bundle length: {len(algorithm_bundle)} characters")
             print(f"Synthesis backend: {args.synthesis_backend}")
             if args.fpga_family:
                 print(f"FPGA family: {args.fpga_family}")
 
-        result = run_pipeline_sync(
-            algorithm_bundle,
+        # Verbose trace hook
+        observability = None
+        if args.verbose:
+            def _trace_emitter(agent_name: str, stage: str, event_type: str, payload: str):
+                symbol = {
+                    "stage_started": "⏳",
+                    "stage_completed": "✅",
+                    "stage_failed": "💥",
+                    "tool_invoked": "🛠️",
+                }.get(event_type, "🔎")
+                try:
+                    details = json.loads(payload)
+                    payload_str = ", ".join(f"{k}={v}" for k, v in details.items())
+                except Exception:
+                    payload_str = payload
+                print(f"{symbol} [{stage}] {event_type} {payload_str}")
+
+            observability = ObservabilityManager(trace_emitter=_trace_emitter)
+
+        # Choose agent runner implementation
+        agent_runner = None
+        runner_choice = args.agent_runner
+        if runner_choice in ('auto', 'openai'):
+            if OpenAIAgentRunner is None:
+                if runner_choice == 'openai':
+                    raise RuntimeError(
+                        "OpenAI Agents SDK is not available. Install the `openai` package to use the openai runner."
+                    )
+            else:
+                try:
+                    agent_runner = OpenAIAgentRunner()
+                    if args.verbose:
+                        print("🤖 Using OpenAI Agents runtime")
+                except Exception as exc:
+                    if runner_choice == 'openai':
+                        raise
+                    if args.verbose:
+                        print(f"⚠️ Falling back to deterministic runner: {exc}")
+
+        if agent_runner is None:
+            agent_runner = DefaultAgentRunner()
+
+        # Create and run simplified pipeline
+        pipeline = SimplifiedPipeline(
             synthesis_backend=args.synthesis_backend,
-            fpga_family=args.fpga_family
+            fpga_family=args.fpga_family,
+            agent_runner=agent_runner,
+            observability=observability,
         )
+        
+        import asyncio
+        result = asyncio.run(pipeline.run(algorithm_bundle))
 
         # Display results
         if result['success']:
             print("✅ Pipeline completed successfully!")
-            summary = result['summary']
-            print(f"   Algorithm: {summary['algorithm']}")
-            print(f"   Target: {summary['target_frequency']}MHz")
-            print(f"   Achieved: {summary['achieved_frequency']:.1f}MHz")
-            print(f"   Resources: {summary['resource_usage']['lut']} LUTs, "
-                  f"{summary['resource_usage']['ff']} FFs, "
-                  f"{summary['resource_usage']['dsp']} DSPs")
-            print(f"   Verification: {'✅ Passed' if summary['verification_passed'] else '❌ Failed'}")
+            
+            # Extract summary from results
+            results = result['results']
+            synth_result = results.get('synth', {})
+            spec_result = results.get('spec', {})
+            
+            algorithm_name = getattr(spec_result, 'name', 'Unknown')
+            target_freq = getattr(spec_result, 'clock_mhz_target', 'N/A')
+            achieved_freq = getattr(synth_result, 'fmax_mhz', 'N/A')
+            
+            print(f"   Algorithm: {algorithm_name}")
+            print(f"   Target: {target_freq}MHz")
+            print(f"   Achieved: {achieved_freq}MHz")
+            
+            # Extract resource usage
+            lut_usage = getattr(synth_result, 'lut_usage', 'N/A')
+            ff_usage = getattr(synth_result, 'ff_usage', 'N/A') 
+            dsp_usage = getattr(synth_result, 'dsp_usage', 'N/A')
+            print(f"   Resources: {lut_usage} LUTs, {ff_usage} FFs, {dsp_usage} DSPs")
+            
+            # Check verification status
+            eval_result = results.get('evaluate', {})
+            overall_score = getattr(eval_result, 'overall_score', 0)
+            verification_status = "✅ Passed" if overall_score >= 70 else "❌ Failed"
+            print(f"   Verification: {verification_status}")
 
             if args.workspace_info:
                 workspace = workspace_manager.get_workspace(result['workspace_token'])

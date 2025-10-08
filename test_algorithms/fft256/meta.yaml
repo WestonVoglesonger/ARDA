@@ -2,7 +2,7 @@ algorithm:
   name: "FFT256"
   description: "256-point Fast Fourier Transform using Cooley-Tukey algorithm with fixed-point arithmetic"
   version: "1.0"
-  author: "ALG2SV Pipeline"
+  author: "ARDA Pipeline"
   license: "MIT"
 
 interface:
