@@ -1,7 +1,7 @@
 """
-Simplified pipeline wrapper that drives the orchestrator with an agent strategy.
+Pipeline wrapper that drives the orchestrator with an agent strategy.
 
-This implementation keeps the legacy `SimplifiedPipeline` import path expected by
+This implementation provides the `Pipeline` class for running ARDA pipelines with
 the CLI and tests, while delegating execution to the modular orchestrator
 stages. It supports feedback-driven retries, collects observability events, and
 falls back to deterministic placeholder agents when no external strategy is
@@ -48,7 +48,7 @@ class StageOrder:
     index: Dict[str, int]
 
 
-class SimplifiedPipeline:
+class Pipeline:
     """
     High-level pipeline runner that coordinates orchestrator stages with feedback.
     """
@@ -394,4 +394,4 @@ class SimplifiedPipeline:
         return workspace_manager.get_workspace(self.workspace_token)
 
 
-__all__ = ["SimplifiedPipeline"]
+__all__ = ["Pipeline"]

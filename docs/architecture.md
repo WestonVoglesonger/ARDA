@@ -107,7 +107,7 @@ Feedback policies decide when to rerun `Quant`, `MicroArch`, `RTL`, or `Synthesi
 3. **Tool Adapters**: Extract workspace, lint, simulation, synthesis utilities into `tools/` modules while maintaining API parity.
 4. **Verification & Static Checks**: Add new stages for lint/simulation gating; integrate into orchestrator while leaving legacy pipeline available behind a feature flag.
 5. **Observability Integration**: Replace ad-hoc logging with structured events; ensure CLI and tests consume new summaries.
-6. **Simplified Mode**: Reimplement simplified pipeline as a preset configuration on the new orchestrator (replacing `simplified_pipeline.py`).
+6. **Simplified Mode**: Reimplement simplified pipeline as a preset configuration on the new orchestrator (replacing `pipeline.py`).
 7. **Retire Legacy Code**: After parity testing, remove `pipeline.py` monolith, consolidate agent orchestration, and update CLI/tests accordingly.
 8. **Package Rename**: Rename the top-level `alg2sv` package to `arda` once API consumers are ready, providing deprecation shims where necessary.
 

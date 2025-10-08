@@ -322,13 +322,13 @@ python -m pytest tests/ -v
 
 # Or run individual components
 python -c "
-from alg2sv.simplified_pipeline import SimplifiedPipeline
+from ardagen.pipeline import Pipeline
 from alg2sv.runtime import DefaultAgentRunner
 from alg2sv.agents import create_default_registry
 from alg2sv.test_algorithms.bpf16_bundle import get_bundle
 
 runner = DefaultAgentRunner(create_default_registry())
-pipeline = SimplifiedPipeline(agent_runner=runner)
+pipeline = Pipeline(agent_runner=runner)
 result = await pipeline.run(bundle_data)
 print('Success!' if result['success'] else 'Failed!')
 "

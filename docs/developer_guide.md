@@ -61,7 +61,7 @@ arda/
 │   ├── runtime/               # Runtime components
 │   │   ├── __init__.py
 │   │   └── agent_runner.py    # Agent runner interface
-│   ├── simplified_pipeline.py # High-level pipeline runner
+│   ├── pipeline.py # High-level pipeline runner
 │   ├── tools/                 # External tool integrations
 │   │   ├── __init__.py
 │   │   ├── lint.py            # RTL linting tools

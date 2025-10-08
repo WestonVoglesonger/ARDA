@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 from typing import Optional
 
-from .simplified_pipeline import SimplifiedPipeline
+from .pipeline import Pipeline
 from .workspace import workspace_manager
 from .runtime import DefaultAgentRunner
 from .observability.manager import ObservabilityManager
@@ -196,8 +196,8 @@ Examples:
         if agent_runner is None:
             agent_runner = DefaultAgentRunner()
 
-        # Create and run simplified pipeline
-        pipeline = SimplifiedPipeline(
+        # Create and run pipeline
+        pipeline = Pipeline(
             synthesis_backend=args.synthesis_backend,
             fpga_family=args.fpga_family,
             agent_runner=agent_runner,

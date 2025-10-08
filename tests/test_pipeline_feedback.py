@@ -3,7 +3,7 @@ from collections import defaultdict, deque
 
 import pytest
 
-from ardagen.simplified_pipeline import SimplifiedPipeline
+from ardagen.pipeline import Pipeline
 from ardagen.domain import (
     SpecContract,
     QuantConfig,
@@ -129,7 +129,7 @@ def _default_stage_outputs():
 
 
 def test_pipeline_retries_synth(monkeypatch):
-    pipeline = SimplifiedPipeline()
+    pipeline = Pipeline()
     stage_outputs = _default_stage_outputs()
     feedback_decisions = deque([
         {"action": "continue"},
@@ -162,7 +162,7 @@ def test_pipeline_retries_synth(monkeypatch):
             result = outputs[0]
         return result
 
-    monkeypatch.setattr(SimplifiedPipeline, "_run_agent_with_context", fake_run, raising=False)
+    monkeypatch.setattr(Pipeline, "_run_agent_with_context", fake_run, raising=False)
 
     result = asyncio.run(pipeline.run(_sample_bundle()))
 
@@ -174,7 +174,7 @@ def test_pipeline_retries_synth(monkeypatch):
 
 
 def test_pipeline_feedback_abort(monkeypatch):
-    pipeline = SimplifiedPipeline()
+    pipeline = Pipeline()
     stage_outputs = _default_stage_outputs()
     # Modify verification to fail so that feedback aborts after verification stage
     stage_outputs['verification'] = deque([
@@ -215,7 +215,7 @@ def test_pipeline_feedback_abort(monkeypatch):
             result = outputs[0]
         return result
 
-    monkeypatch.setattr(SimplifiedPipeline, "_run_agent_with_context", fake_run, raising=False)
+    monkeypatch.setattr(Pipeline, "_run_agent_with_context", fake_run, raising=False)
 
     result = asyncio.run(pipeline.run(_sample_bundle()))
 

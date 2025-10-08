@@ -569,9 +569,9 @@ async def test_rtl_stage():
 @pytest.mark.integration
 async def test_full_pipeline():
     """Test complete pipeline execution."""
-    from ardagen.simplified_pipeline import SimplifiedPipeline
+    from ardagen.pipeline import Pipeline
 
-    pipeline = SimplifiedPipeline()
+    pipeline = Pipeline()
     bundle = create_test_bundle()
 
     # Run complete pipeline
