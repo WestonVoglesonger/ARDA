@@ -3,8 +3,8 @@ from typing import Any, Dict, Mapping
 
 import pytest
 
-from alg2sv.core import PipelineOrchestrator, PipelineRunResult
-from alg2sv.core.stages import (
+from ardagen.core import PipelineOrchestrator, PipelineRunResult
+from ardagen.core.stages import (
     SpecStage,
     QuantStage,
     MicroArchStage,
@@ -15,8 +15,8 @@ from alg2sv.core.stages import (
     EvaluateStage,
     Stage,
 )
-from alg2sv.core.strategies import AgentStrategy
-from alg2sv.domain import (
+from ardagen.core.strategies import AgentStrategy
+from ardagen.domain import (
     SpecContract,
     QuantConfig,
     MicroArchConfig,

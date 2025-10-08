@@ -3,7 +3,7 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "arda"
+name = "ardagen"
 version = "0.1.0"
 description = "ARDA: Automated RTL Design with Agents for SystemVerilog generation"
 readme = "README.md"
@@ -50,15 +50,14 @@ Repository = "https://github.com/your-repo/arda"
 Documentation = "https://github.com/your-repo/arda#readme"
 
 [project.scripts]
-arda = "alg2sv.cli:main"
-alg2sv = "alg2sv.cli:main"
+arda = "ardagen.cli:main"
 
 [tool.setuptools]
 include-package-data = true
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["alg2sv*", "arda*"]
+include = ["ardagen*"]
 exclude = ["tests*", "test_*", "*.tests*", "*.tests.*"]
 
 # Black code formatting
@@ -71,7 +70,7 @@ include = '\.pyi?$'
 [tool.isort]
 profile = "black"
 line_length = 100
-src_paths = ["alg2sv", "tests"]
+src_paths = ["arda", "tests"]
 
 # MyPy type checking
 [tool.mypy]

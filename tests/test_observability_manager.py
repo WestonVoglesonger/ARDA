@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
-from alg2sv.observability.manager import ObservabilityManager
-from alg2sv.observability.events import ObservabilityEventType
+from ardagen.observability.manager import ObservabilityManager
+from ardagen.observability.events import ObservabilityEventType
 
 
 @dataclass

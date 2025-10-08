@@ -3,8 +3,8 @@ from collections import defaultdict, deque
 
 import pytest
 
-from alg2sv.simplified_pipeline import SimplifiedPipeline
-from alg2sv.domain import (
+from ardagen.simplified_pipeline import SimplifiedPipeline
+from ardagen.domain import (
     SpecContract,
     QuantConfig,
     MicroArchConfig,

@@ -3,7 +3,7 @@ Tests for workspace management functionality.
 """
 
 import pytest
-from alg2sv.workspace import ingest_from_bundle, read_source, write_artifact, WorkspaceManager
+from ardagen.workspace import ingest_from_bundle, read_source, write_artifact, WorkspaceManager
 
 
 class TestWorkspace:
