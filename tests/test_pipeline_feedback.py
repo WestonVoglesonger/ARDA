@@ -8,6 +8,8 @@ from ardagen.domain import (
     SpecContract,
     QuantConfig,
     MicroArchConfig,
+    ArchitectureConfig,
+    ModuleSpec,
     RTLConfig,
     SynthResults,
     LintResults,
@@ -56,6 +58,32 @@ def _default_stage_outputs():
                 dsp_usage_estimate=8,
                 estimated_latency_cycles=6,
                 handshake_protocol="ready_valid",
+            )
+        ]),
+        'architecture': deque([
+            ArchitectureConfig(
+                architecture_type="pipelined_fir",
+                decomposition_rationale="Test architecture",
+                modules=[
+                    ModuleSpec(
+                        name="params_pkg", purpose="Parameters", file_name="params.svh",
+                        estimated_lines=50, inputs=[], outputs=[], instantiates=[]
+                    ),
+                    ModuleSpec(
+                        name="core", purpose="Core", file_name="core.sv",
+                        estimated_lines=100, inputs=[], outputs=[], instantiates=[]
+                    ),
+                    ModuleSpec(
+                        name="top", purpose="Top", file_name="top.sv",
+                        estimated_lines=50, inputs=[], outputs=[], instantiates=["core"]
+                    ),
+                ],
+                top_module="top",
+                hierarchy_diagram="top -> core",
+                pipeline_stages=4,
+                parallelism_factor=1,
+                memory_architecture="distributed_regs",
+                confidence=90.0
             )
         ]),
         'rtl': deque([

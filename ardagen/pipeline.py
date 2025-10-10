@@ -21,6 +21,7 @@ from .core.stages import (
     EvaluateStage,
     StaticChecksStage,
     MicroArchStage,
+    ArchitectureStage,
     QuantStage,
     RTLStage,
     VerificationStage,
@@ -57,6 +58,7 @@ class Pipeline:
         SpecStage,
         QuantStage,
         MicroArchStage,
+        ArchitectureStage,
         RTLStage,
         StaticChecksStage,
         VerificationStage,
@@ -66,7 +68,7 @@ class Pipeline:
     _stage_names: Tuple[str, ...] = tuple(builder().name for builder in _stage_builders)
     _stage_order = StageOrder(names=_stage_names, index={name: idx for idx, name in enumerate(_stage_names)})
     _feedback_stages: frozenset[str] = frozenset(
-        {"spec", "quant", "microarch", "rtl", "static_checks", "verification", "synth", "evaluate"}
+        {"spec", "quant", "microarch", "architecture", "rtl", "static_checks", "verification", "synth", "evaluate"}
     )
 
     def __init__(

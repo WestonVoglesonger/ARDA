@@ -48,6 +48,7 @@ class OpenAIAgentRunner(PipelineAgentRunner):
         "spec": "spec_agent",
         "quant": "quant_agent",
         "microarch": "microarch_agent",
+        "architecture": "architecture_agent",
         "rtl": "rtl_agent",
         "verification": "verify_agent",
         "synth": "synth_agent",
@@ -66,6 +67,10 @@ class OpenAIAgentRunner(PipelineAgentRunner):
             "pipeline_depth", "unroll_factor", "memory_config",
             "estimated_latency_cycles", "handshake_protocol"
         },
+        "architecture": {
+            "architecture_type", "decomposition_rationale", "modules",
+            "top_module", "hierarchy_diagram", "confidence"
+        },
         "rtl": {  # flexible, varies by your agent schema
             "verilog", "files", "modules", "top_module", "constraints", "confidence"
         },
@@ -81,7 +86,7 @@ class OpenAIAgentRunner(PipelineAgentRunner):
     }
 
     # For stages that expect a dict, not a list
-    _EXPECTS_OBJECT: Set[str] = {"spec", "quant", "microarch", "rtl", "verification", "synth", "feedback"}
+    _EXPECTS_OBJECT: Set[str] = {"spec", "quant", "microarch", "architecture", "rtl", "verification", "synth", "feedback"}
 
     _FEEDBACK_SCHEMA = {
         "name": "feedback_decision",
@@ -96,6 +101,7 @@ class OpenAIAgentRunner(PipelineAgentRunner):
                         "retry_spec",
                         "retry_quant",
                         "retry_microarch",
+                        "retry_architecture",
                         "retry_rtl",
                         "retry_verification",
                         "retry_synth",

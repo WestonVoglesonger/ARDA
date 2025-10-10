@@ -320,6 +320,53 @@ def _parse_simulation_output(stdout: str, stderr: str, test_vectors: list) -> Di
     }
 
 
+def web_search(query: str, num_results: int = 3) -> str:
+    """
+    Search the web for RTL architecture information.
+    
+    Args:
+        query: Search query string
+        num_results: Number of results to return (default 3)
+    
+    Returns:
+        JSON string with search results
+    """
+    # Note: You'll need to configure a search API (Google Custom Search, Bing, etc.)
+    # For now, return placeholder that indicates web search capability
+    
+    # Example implementation with DuckDuckGo (no API key needed):
+    try:
+        from ddgs import DDGS
+        
+        results = []
+        with DDGS() as ddgs:
+            search_results = ddgs.text(query, max_results=num_results)
+            for i, result in enumerate(search_results):
+                results.append({
+                    "title": result.get("title", ""),
+                    "url": result.get("link", result.get("href", "")),
+                    "snippet": result.get("body", result.get("snippet", ""))
+                })
+                if i >= num_results - 1:
+                    break
+        
+        return json.dumps({"query": query, "results": results}, indent=2)
+    
+    except ImportError:
+        # Fallback if ddgs not installed
+        return json.dumps({
+            "query": query,
+            "results": [],
+            "note": "Web search not available. Install ddgs: pip install ddgs"
+        })
+    except Exception as e:
+        return json.dumps({
+            "query": query,
+            "error": str(e),
+            "results": []
+        })
+
+
 def _require_workspace(workspace_token: str):
     workspace = workspace_manager.get_workspace(workspace_token)
     if workspace is None:
@@ -334,6 +381,7 @@ FUNCTION_MAP = {
     "submit_synth_job": submit_synth_job,
     "fetch_synth_results": fetch_synth_results,
     "run_simulation": run_simulation,
+    "web_search": web_search,
 }
 
 
@@ -356,6 +404,7 @@ __all__ = [
     "submit_synth_job",
     "fetch_synth_results",
     "run_simulation",
+    "web_search",
     "FUNCTION_MAP",
     "call_tool",
 ]

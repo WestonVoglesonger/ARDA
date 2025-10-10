@@ -1,0 +1,685 @@
+{
+  "agents": {
+    "spec_agent": {
+      "name": "Spec Agent",
+      "instructions": "Analyze the input algorithm and generate hardware contract specifications. Read the algorithm code and metadata to understand I/O requirements, performance targets, and resource constraints. Output structured JSON with contract details.",
+      "tools": [],
+      "output_schema": {
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "clock_mhz_target": {
+          "type": "number"
+        },
+        "throughput_samples_per_cycle": {
+          "type": "integer"
+        },
+        "input_format": {
+          "type": "object",
+          "properties": {
+            "width": {
+              "type": "number"
+            },
+            "fractional_bits": {
+              "type": "number"
+            }
+          }
+        },
+        "output_format": {
+          "type": "object",
+          "properties": {
+            "width": {
+              "type": "number"
+            },
+            "fractional_bits": {
+              "type": "number"
+            }
+          }
+        },
+        "resource_budget": {
+          "type": "object",
+          "properties": {
+            "lut": {
+              "type": "number"
+            },
+            "ff": {
+              "type": "number"
+            },
+            "dsp": {
+              "type": "number"
+            },
+            "bram": {
+              "type": "number"
+            }
+          }
+        },
+        "verification_config": {
+          "type": "object",
+          "properties": {
+            "num_samples": {
+              "type": "number"
+            },
+            "tolerance_abs": {
+              "type": "number"
+            }
+          }
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Confidence level (0-100%) in the generated specification"
+        }
+      }
+    },
+    "quant_agent": {
+      "name": "Quant Agent",
+      "instructions": "Convert floating-point algorithm to fixed-point representation. Analyze coefficient ranges, compute quantization errors, and determine optimal bit widths. Use code interpreter for numerical analysis.\n\nIMPORTANT: Check the 'latest_feedback' field in your context for any guidance from the feedback agent. If there are retry instructions or specific guidance, incorporate them into your quantization decisions.\n\nCRITICAL: You must return actual data values, not JSON schema definitions. For example, return {\"input_width\": 8, \"input_frac\": 6} not {\"type\": \"number\"}. Always provide concrete values for all required fields.",
+      "tools": [
+        {
+          "type": "function",
+          "name": "read_source",
+          "description": "Read algorithm and coefficient data"
+        },
+        {
+          "type": "code_interpreter",
+          "description": "Run Python code for quantization analysis and error metrics"
+        }
+      ],
+      "output_schema": {
+        "fixed_point_config": {
+          "type": "object",
+          "properties": {
+            "input_width": {
+              "type": "number"
+            },
+            "input_frac": {
+              "type": "number"
+            },
+            "output_width": {
+              "type": "number"
+            },
+            "output_frac": {
+              "type": "number"
+            },
+            "coeff_width": {
+              "type": "number"
+            },
+            "coeff_frac": {
+              "type": "number"
+            },
+            "accumulator_width": {
+              "type": "number"
+            }
+          }
+        },
+        "error_metrics": {
+          "type": "object",
+          "properties": {
+            "max_abs_error": {
+              "type": "number"
+            },
+            "rms_error": {
+              "type": "number"
+            },
+            "snr_db": {
+              "type": "number"
+            }
+          }
+        },
+        "quantized_coefficients": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "fxp_model_path": {
+          "type": "string"
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Confidence level (0-100%) in the quantization decisions"
+        }
+      }
+    },
+    "microarch_agent": {
+      "name": "MicroArch Agent",
+      "instructions": "Design micro-architecture for the algorithm. Determine pipeline depth, unroll factors, memory mapping, and dataflow. Balance performance vs resource usage.",
+      "tools": [
+        {
+          "type": "code_interpreter",
+          "description": "Calculate pipeline timing and resource estimates"
+        }
+      ],
+      "output_schema": {
+        "pipeline_depth": {
+          "type": "number"
+        },
+        "unroll_factor": {
+          "type": "number"
+        },
+        "memory_config": {
+          "type": "object",
+          "properties": {
+            "use_bram": {
+              "type": "boolean"
+            },
+            "buffer_depth": {
+              "type": "number"
+            }
+          }
+        },
+        "dsp_usage_estimate": {
+          "type": "number"
+        },
+        "estimated_latency_cycles": {
+          "type": "number"
+        },
+        "handshake_protocol": {
+          "type": "string",
+          "enum": [
+            "ready_valid",
+            "axis"
+          ]
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Confidence level (0-100%) in the microarchitecture decisions"
+        }
+      }
+    },
+    "architecture_agent": {
+      "name": "Architecture Agent",
+      "instructions": "You are the RTL Architecture Design Agent. Your role is to design the COMPLETE modular architecture for the RTL implementation before any code is written.\n\nTASK: Analyze the algorithm and design an optimal, modular RTL architecture.\n\nINPUTS:\n- spec: Algorithm requirements, clock target, I/O formats, resource budget\n- quant: Fixed-point configuration, coefficient counts\n- microarch: Pipeline depth, unroll factor, handshake protocol\n\nYOUR RESPONSIBILITY - FULL ARCHITECTURAL DECOMPOSITION:\n\n1. RESEARCH PHASE:\n   - Use web_search to look up standard architectures for this algorithm type\n   - Examples:\n     * 'FIR filter RTL architecture best practices'\n     * 'Conv2D systolic array FPGA implementation'\n     * 'FFT butterfly network RTL design'\n     * 'Adaptive filter LMS RTL architecture'\n   - Study 2-3 relevant sources to understand proven patterns\n   \n2. DECOMPOSITION PHASE:\n   - Break down the algorithm into 3-15 logical RTL modules\n   - Each module should have ONE clear responsibility\n   - Target 50-150 lines per module (except parameters)\n   \n   GUIDELINES BY ALGORITHM TYPE:\n   \n   FIR Filter:\n   - fir_params.svh (parameters)\n   - fir_mac_pipeline.sv (multiply-accumulate with pipeline)\n   - fir_adder_tree.sv (pipelined reduction tree)\n   - fir_coeff_rom.sv (coefficient storage)\n   - fir_tap_buffer.sv (sample shift register)\n   - fir_top.sv (integration)\n   \n   Conv2D:\n   - conv2d_params.svh (parameters)\n   - conv2d_line_buffer.sv (stores 2-3 rows for sliding window)\n   - conv2d_window_extractor.sv (extracts 3x3 window from line buffer)\n   - conv2d_pe.sv (processing element: one MAC unit)\n   - conv2d_pe_array.sv (array of PEs for parallel channels)\n   - conv2d_activation.sv (ReLU/activation function)\n   - conv2d_control_fsm.sv (control state machine)\n   - conv2d_top.sv (integration)\n   \n   FFT:\n   - fft_params.svh (parameters, twiddle factors)\n   - fft_bit_reversal.sv (input reordering)\n   - fft_butterfly.sv (single butterfly operation)\n   - fft_stage.sv (one FFT stage with multiple butterflies)\n   - fft_twiddle_rom.sv (twiddle factor storage)\n   - fft_control_fsm.sv (stage sequencing)\n   - fft_memory.sv (intermediate result storage)\n   - fft_top.sv (integration)\n   \n   Adaptive Filter:\n   - adaptive_params.svh (parameters)\n   - fir_mac_pipeline.sv (FIR computation)\n   - lms_update_unit.sv (coefficient adaptation)\n   - error_computation.sv (error signal calculation)\n   - tap_delay_buffer.sv (aligned tap storage)\n   - adaptive_filter_top.sv (integration)\n\n3. INTERFACE DEFINITION:\n   - Define ALL ports for each module (name, width, direction)\n   - Use standard ready/valid handshake\n   - Specify any control signals (enable, reset, etc.)\n   \n4. HIERARCHY DESIGN:\n   - Define which modules instantiate which sub-modules\n   - Ensure NO circular dependencies\n   - Top module should integrate all components\n   \n5. FILE ORGANIZATION:\n   - Assign each module to a file (module_name.sv)\n   - One parameters file (params.svh or algorithm_params.svh)\n   - Files should be logically named (e.g., 'conv2d_pe.sv', 'fir_mac.sv')\n\nCRITICAL RULES:\n- NEVER design a monolithic single-module architecture\n- Each module must have a SINGLE, CLEAR responsibility\n- Separate computation from control\n- Separate memory structures (FIFOs, buffers) into dedicated modules\n- Use pipelining to meet timing (split long combinational paths)\n\nTOOLS AVAILABLE:\n- web_search: Search online for architecture patterns, best practices, reference designs\n- code_interpreter: Analyze algorithm complexity, estimate resource usage\n\nOUTPUT FORMAT:\nReturn a complete ArchitectureConfig with:\n- architecture_type (e.g., 'pipelined_fir', 'systolic_array')\n- decomposition_rationale (why this decomposition)\n- modules: List of ModuleSpec (3-15 modules)\n  * Each with: name, purpose, file_name, estimated_lines\n  * inputs/outputs (port specifications)\n  * instantiates (list of sub-module names)\n- top_module (name of top-level module)\n- hierarchy_diagram (ASCII art showing module relationships)\n- pipeline_stages, parallelism_factor, memory_architecture\n- research_sources (URLs you consulted)\n\nREMEMBER: You are designing the ARCHITECTURE, not implementing code. Be thorough, modular, and research-driven.",
+      "tools": [
+        {
+          "type": "function",
+          "name": "web_search",
+          "description": "Search the web for RTL architecture patterns, best practices, and reference designs"
+        },
+        {
+          "type": "code_interpreter",
+          "description": "Analyze algorithm complexity and estimate resource usage"
+        }
+      ],
+      "output_schema": {
+        "architecture_type": {
+          "type": "string",
+          "description": "High-level architecture pattern (e.g., 'pipelined_fir', 'systolic_array', 'butterfly_network')"
+        },
+        "decomposition_rationale": {
+          "type": "string",
+          "description": "Explanation of why this module decomposition was chosen"
+        },
+        "modules": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {"type": "string"},
+              "purpose": {"type": "string"},
+              "file_name": {"type": "string"},
+              "estimated_lines": {"type": "number"},
+              "inputs": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {"type": "string"},
+                    "width": {"type": "string"},
+                    "description": {"type": "string"}
+                  }
+                }
+              },
+              "outputs": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {"type": "string"},
+                    "width": {"type": "string"},
+                    "description": {"type": "string"}
+                  }
+                }
+              },
+              "parameters": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {"type": "string"},
+                    "value": {"type": "string"}
+                  }
+                }
+              },
+              "instantiates": {
+                "type": "array",
+                "items": {"type": "string"}
+              }
+            },
+            "required": ["name", "purpose", "file_name", "estimated_lines", "inputs", "outputs"]
+          },
+          "minItems": 3,
+          "maxItems": 15
+        },
+        "top_module": {"type": "string"},
+        "hierarchy_diagram": {"type": "string"},
+        "parameters_file": {"type": "string"},
+        "pipeline_stages": {"type": "number"},
+        "parallelism_factor": {"type": "number"},
+        "memory_architecture": {"type": "string"},
+        "confidence": {"type": "number", "minimum": 0, "maximum": 100},
+        "research_sources": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      }
+    },
+    "rtl_agent": {
+      "name": "RTL Agent",
+      "instructions": "You are the RTL Implementation Agent. You implement the architecture designed by the Architecture Agent.\n\nINPUTS:\n- spec, quant, microarch: Design requirements\n- architecture: COMPLETE module decomposition with interfaces and hierarchy\n\nYOUR TASK: Implement EVERY module specified in architecture.modules\n\nIMPLEMENTATION GUIDELINES:\n\n1. FOLLOW THE ARCHITECTURE:\n   - Generate EXACTLY the modules specified in architecture.modules\n   - Use the EXACT file names from architecture (e.g., architecture.modules[0].file_name)\n   - Implement the EXACT interfaces (inputs/outputs) specified\n   - Follow the hierarchy (instantiate sub-modules as specified)\n\n2. MODULE IMPLEMENTATION:\n   - Each module should be 50-150 lines (focused, single-responsibility)\n   - Use proper SystemVerilog constructs (always_ff, always_comb, generate)\n   - Follow the handshake protocol from microarch\n   - Implement pipelining as specified in architecture.pipeline_stages\n\n3. CODE QUALITY:\n   - Synthesizable SystemVerilog only\n   - No combinational loops\n   - No multiple drivers for same signal\n   - Proper reset handling\n   - Clear comments explaining functionality\n\n4. FILE ORGANIZATION:\n   - Use architecture.modules[].file_name for each module\n   - Include architecture.parameters_file for parameters\n   - Ensure top_module matches architecture.top_module\n\nOUTPUT FORMAT:\n{\n  \"generated_files\": {\n    \"<file_key_sv>\": \"<complete SystemVerilog code>\",\n    \"<file_key_svh>\": \"<complete package code>\",\n    ...\n  },\n  \"file_paths\": [\"rtl/file1.sv\", \"rtl/file2.sv\", ...],\n  \"top_module\": \"<from architecture>\",\n  \"estimated_resources\": {...},\n  \"confidence\": 85\n}\n\nFILE KEY NAMING:\n- Convert file_name to key: \"conv2d_pe.sv\" → \"conv2d_pe_sv\"\n- Convert file_name to key: \"params.svh\" → \"params_svh\"\n\nCRITICAL: Generate ALL modules from architecture. Missing modules will break the design.",
+      "tools": [],
+      "output_schema": {
+        "generated_files": {
+          "type": "object",
+          "description": "Generated RTL files keyed by logical name (snake_case ending in _sv or _svh)",
+          "additionalProperties": {
+            "type": "string",
+            "minLength": 100,
+            "maxLength": 50000
+          },
+          "minProperties": 3,
+          "maxProperties": 15
+        },
+        "file_paths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Paths where files will be written",
+          "minItems": 3,
+          "maxItems": 15
+        },
+        "top_module": {
+          "type": "string"
+        },
+        "params_file": {
+          "type": "string"
+        },
+        "lint_passed": {
+          "type": "boolean"
+        },
+        "estimated_resources": {
+          "type": "object",
+          "properties": {
+            "lut": {
+              "type": "number"
+            },
+            "ff": {
+              "type": "number"
+            },
+            "dsp": {
+              "type": "number"
+            }
+          }
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Confidence level (0-100%) in the RTL generation quality"
+        }
+      }
+    },
+    "verify_agent": {
+      "name": "Verify Agent",
+      "instructions": "Run functional verification against golden reference. Use code interpreter to execute Python golden model and compare with RTL simulation results. Report pass/fail and error metrics.",
+      "tools": [
+        {
+          "type": "function",
+          "name": "read_source",
+          "description": "Read test vectors and RTL files"
+        },
+        {
+          "type": "code_interpreter",
+          "description": "Run golden model and compute verification metrics"
+        },
+        {
+          "type": "function",
+          "name": "run_simulation",
+          "description": "Execute RTL simulation (if available)"
+        }
+      ],
+      "output_schema": {
+        "tests_total": {
+          "type": "number"
+        },
+        "tests_passed": {
+          "type": "number"
+        },
+        "all_passed": {
+          "type": "boolean"
+        },
+        "mismatches": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "test_index": {
+                "type": "number"
+              },
+              "expected": {
+                "type": "number"
+              },
+              "actual": {
+                "type": "number"
+              },
+              "error": {
+                "type": "number"
+              }
+            }
+          }
+        },
+        "max_abs_error": {
+          "type": "number"
+        },
+        "rms_error": {
+          "type": "number"
+        },
+        "functional_coverage": {
+          "type": "number"
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Confidence level (0-100%) in the verification results"
+        }
+      }
+    },
+    "synth_agent": {
+      "name": "Synth Agent",
+      "instructions": "Synthesize RTL design and report implementation results. Dispatch to synthesis tool (Yosys/Vivado) and return timing/area metrics. If timing fails, suggest optimizations.",
+      "tools": [
+        {
+          "type": "function",
+          "name": "submit_synth_job",
+          "description": "Dispatch synthesis job to CI/CD pipeline"
+        },
+        {
+          "type": "function",
+          "name": "fetch_synth_results",
+          "description": "Poll for synthesis completion and retrieve results"
+        }
+      ],
+      "output_schema": {
+        "fmax_mhz": {
+          "type": "number"
+        },
+        "timing_met": {
+          "type": "boolean"
+        },
+        "lut_usage": {
+          "type": "number"
+        },
+        "ff_usage": {
+          "type": "number"
+        },
+        "dsp_usage": {
+          "type": "number"
+        },
+        "bram_usage": {
+          "type": "number"
+        },
+        "total_power_mw": {
+          "type": "number"
+        },
+        "slack_ns": {
+          "type": "number"
+        },
+        "reports_path": {
+          "type": "string"
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Confidence level (0-100%) in the synthesis results"
+        }
+      }
+    }
+  },
+  "logic_nodes": {
+    "verify_routing": {
+      "type": "if_else",
+      "condition": "verify_agent_output.all_passed == true",
+      "true_path": "synth_agent",
+      "false_path": "error_note"
+    },
+    "budget_check": {
+      "type": "transform",
+      "expression": "within_budget = (synth_output.lut_usage <= spec_output.resource_budget.lut) && (synth_output.ff_usage <= spec_output.resource_budget.ff) && (synth_output.dsp_usage <= spec_output.resource_budget.dsp) && (synth_output.bram_usage <= spec_output.resource_budget.bram)",
+      "output": "budget_check_result"
+    },
+    "final_gate": {
+      "type": "if_else",
+      "condition": "synth_output.timing_met == true && budget_check_result.within_budget == true",
+      "true_path": "success_end",
+      "false_path": "failure_note"
+    }
+  },
+  "function_tools": {
+    "ingest_from_bundle": {
+      "schema": {
+        "name": "ingest_from_bundle",
+        "description": "Parse algorithm bundle string into virtual workspace",
+        "strict": false,
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "raw_bundle": {
+              "type": "string"
+            },
+            "normalize": {
+              "type": "boolean",
+              "default": false
+            }
+          },
+          "required": [
+            "raw_bundle"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "read_source": {
+      "schema": {
+        "name": "read_source",
+        "description": "Read file from virtual workspace",
+        "strict": true,
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "workspace_token": {
+              "type": "string"
+            },
+            "path": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "workspace_token",
+            "path"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "submit_synth_job": {
+      "schema": {
+        "name": "submit_synth_job",
+        "description": "Dispatch FPGA synthesis job",
+        "strict": false,
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "repo": {
+              "type": "string"
+            },
+            "ref": {
+              "type": "string"
+            },
+            "top": {
+              "type": "string"
+            },
+            "rtl_glob": {
+              "type": "string"
+            },
+            "toolchain": {
+              "type": "string"
+            },
+            "constraint_file": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "repo",
+            "ref",
+            "top",
+            "rtl_glob",
+            "toolchain"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "fetch_synth_results": {
+      "schema": {
+        "name": "fetch_synth_results",
+        "description": "Retrieve synthesis results",
+        "strict": true,
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "repo": {
+              "type": "string"
+            },
+            "run_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "repo",
+            "run_id"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "run_simulation": {
+      "schema": {
+        "name": "run_simulation",
+        "description": "Execute RTL simulation",
+        "strict": false,
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "rtl_files": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "test_vectors": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            },
+            "simulator": {
+              "type": "string",
+              "default": "iverilog"
+            }
+          },
+          "required": [
+            "rtl_files",
+            "test_vectors"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "web_search": {
+      "schema": {
+        "name": "web_search",
+        "description": "Search the web for RTL architecture patterns, best practices, and reference designs",
+        "strict": false,
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string",
+              "description": "Search query (e.g., 'FIR filter RTL architecture', 'Conv2D systolic array FPGA')"
+            },
+            "num_results": {
+              "type": "number",
+              "description": "Number of results to return (1-5)",
+              "default": 3
+            }
+          },
+          "required": [
+            "query"
+          ],
+          "additionalProperties": false
+        }
+      }
+    }
+  },
+  "feedback": {
+    "name": "Feedback Agent",
+    "instructions": "You are the ARDA feedback agent. Review stage results and suggest whether to continue, retry a specific stage, tune microarchitecture, or abort. Analyze the stage outputs for quality issues, inconsistencies, or failures. Provide clear reasoning for your decisions.\n\nWhen suggesting retries, provide specific guidance in the 'guidance' field that the retried stage agent can use to improve its output. For example:\n- For quant retries: 'Use more conservative bit widths to reduce quantization error'\n- For schedule retries: 'Increase unroll factor to improve throughput'\n- For memory retries: 'Reduce buffer sizes to fit within BRAM budget'\n\nAlways explain your reasoning in the 'notes' field.",
+    "tools": [],
+    "output_schema": {
+      "action": {
+        "type": "string",
+        "enum": [
+          "continue",
+          "abort",
+          "retry_spec",
+          "retry_quant",
+          "retry_schedule",
+          "retry_memory",
+          "retry_io",
+          "retry_microarch",
+          "retry_architecture",
+          "retry_rtl",
+          "retry_verification",
+          "retry_synth",
+          "tune_microarch"
+        ]
+      },
+      "target_stage": {
+        "type": "string",
+        "description": "Specific stage this decision applies to"
+      },
+      "guidance": {
+        "type": "string",
+        "description": "Additional instructions or context for the targeted stage retry or adjustment"
+      },
+      "notes": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Optional structured notes for logging or downstream analysis"
+      }
+    }
+  }
+}

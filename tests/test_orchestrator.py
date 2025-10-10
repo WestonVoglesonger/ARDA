@@ -8,6 +8,7 @@ from ardagen.core.stages import (
     SpecStage,
     QuantStage,
     MicroArchStage,
+    ArchitectureStage,
     RTLStage,
     StaticChecksStage,
     VerificationStage,
@@ -20,6 +21,8 @@ from ardagen.domain import (
     SpecContract,
     QuantConfig,
     MicroArchConfig,
+    ArchitectureConfig,
+    ModuleSpec,
     RTLConfig,
     LintResults,
     VerifyResults,
@@ -71,6 +74,30 @@ async def test_orchestrator_executes_stage_sequence_with_quality_gates():
         dsp_usage_estimate=8,
         estimated_latency_cycles=6,
         handshake_protocol="ready_valid",
+    )
+    architecture_output = ArchitectureConfig(
+        architecture_type="pipelined_fir",
+        decomposition_rationale="Simple test architecture",
+        modules=[
+            ModuleSpec(
+                name="params_pkg", purpose="Parameters", file_name="params.svh",
+                estimated_lines=50, inputs=[], outputs=[], instantiates=[]
+            ),
+            ModuleSpec(
+                name="core", purpose="Core logic", file_name="core.sv",
+                estimated_lines=100, inputs=[], outputs=[], instantiates=[]
+            ),
+            ModuleSpec(
+                name="top", purpose="Top wrapper", file_name="top.sv",
+                estimated_lines=50, inputs=[], outputs=[], instantiates=["core"]
+            ),
+        ],
+        top_module="top",
+        hierarchy_diagram="top -> core",
+        pipeline_stages=4,
+        parallelism_factor=1,
+        memory_architecture="distributed_regs",
+        confidence=90.0
     )
     rtl_output = RTLConfig(
         generated_files={
@@ -130,6 +157,7 @@ async def test_orchestrator_executes_stage_sequence_with_quality_gates():
             "spec": spec_output,
             "quant": quant_output,
             "microarch": microarch_output,
+            "architecture": architecture_output,
             "rtl": rtl_output,
             "static_checks": lint_output,
             "verification": verification_output,
@@ -142,6 +170,7 @@ async def test_orchestrator_executes_stage_sequence_with_quality_gates():
             SpecStage(),
             QuantStage(),
             MicroArchStage(),
+            ArchitectureStage(),
             RTLStage(),
             StaticChecksStage(),
             VerificationStage(),
@@ -157,6 +186,7 @@ async def test_orchestrator_executes_stage_sequence_with_quality_gates():
         "spec",
         "quant",
         "microarch",
+        "architecture",
         "rtl",
         "static_checks",
         "verification",
@@ -166,6 +196,7 @@ async def test_orchestrator_executes_stage_sequence_with_quality_gates():
     assert result.get("spec") == spec_output
     assert result.get("quant") == quant_output
     assert result.get("microarch") == microarch_output
+    assert result.get("architecture") == architecture_output
     assert result.get("rtl") == rtl_output
     assert result.get("static_checks") == lint_output
     assert result.get("verification") == verification_output
@@ -176,7 +207,10 @@ async def test_orchestrator_executes_stage_sequence_with_quality_gates():
     assert "spec" in strategy.calls["quant"]["inputs"]
     assert "spec" in strategy.calls["microarch"]["inputs"]
     assert "quant" in strategy.calls["microarch"]["inputs"]
-    assert "microarch" in strategy.calls["rtl"]["inputs"]
+    assert "spec" in strategy.calls["architecture"]["inputs"]
+    assert "quant" in strategy.calls["architecture"]["inputs"]
+    assert "microarch" in strategy.calls["architecture"]["inputs"]
+    assert "architecture" in strategy.calls["rtl"]["inputs"]
     assert "rtl" in strategy.calls["static_checks"]["inputs"]
     assert "static_checks" in strategy.calls["synth"]["inputs"]
     assert "verification" in strategy.calls["synth"]["inputs"]

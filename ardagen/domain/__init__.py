@@ -6,7 +6,7 @@ stable import paths while the architecture refactor progresses.
 
 from .contracts import SpecContract
 from .quantization import QuantConfig
-from .architecture import MicroArchConfig
+from .architecture import MicroArchConfig, ArchitectureConfig, ModuleSpec
 from .rtl_artifacts import RTLConfig
 from .verification import (
     VerifyResults,
@@ -21,6 +21,8 @@ __all__ = [
     "SpecContract",
     "QuantConfig",
     "MicroArchConfig",
+    "ArchitectureConfig",
+    "ModuleSpec",
     "RTLConfig",
     "VerifyResults",
     "LintResults",

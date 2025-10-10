@@ -6,6 +6,7 @@ from .base import Stage, StageContext
 from .spec_stage import SpecStage
 from .quant_stage import QuantStage
 from .microarch_stage import MicroArchStage
+from .architecture_stage import ArchitectureStage
 from .rtl_stage import RTLStage
 from .lint_stage import StaticChecksStage
 from .simulation_stage import VerificationStage
@@ -18,6 +19,7 @@ __all__ = [
     "SpecStage",
     "QuantStage",
     "MicroArchStage",
+    "ArchitectureStage",
     "RTLStage",
     "StaticChecksStage",
     "VerificationStage",
