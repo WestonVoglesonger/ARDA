@@ -5,6 +5,7 @@ RTL generation stage for the ARDA orchestrator.
 from __future__ import annotations
 
 from typing import Any, Dict, TYPE_CHECKING
+import re
 
 from pydantic import BaseModel
 from .base import Stage, StageContext
@@ -95,13 +96,25 @@ class RTLStage(Stage):
         
         # Check for module/package
         if logical_name.endswith("_svh"):
-            if not any(kw in content for kw in ["package ", "parameter ", "typedef "]):
+            header_markers = (
+                "package ",
+                "parameter ",
+                "typedef ",
+                "localparam ",
+                "`define ",
+                "`ifndef ",
+                "`include ",
+            )
+            if not any(marker in content for marker in header_markers):
                 return False
         else:
-            if "module " not in content or "endmodule" not in content:
+            module_count = len(re.findall(r"\bmodule\b", content))
+            endmodule_count = content.count("endmodule")
+
+            if module_count == 0 or endmodule_count == 0:
                 return False
             
-            if content.count("module ") != content.count("endmodule"):
+            if module_count != endmodule_count:
                 return False
         
         return True
