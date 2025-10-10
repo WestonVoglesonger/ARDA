@@ -1,0 +1,290 @@
+# ALG2SV - Algorithm to SystemVerilog Pipeline
+# Comprehensive .gitignore for FPGA development and Python projects
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# Translations
+*.mo
+*.pot
+
+# Django stuff:
+*.log
+local_settings.py
+db.sqlite3
+
+# Flask stuff:
+instance/
+.webassets-cache
+
+# Scrapy stuff:
+.scrapy
+
+# Sphinx documentation
+docs/_build/
+
+# PyBuilder
+target/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# celery beat schedule file
+celerybeat-schedule
+
+# SageMath parsed files
+*.sage.py
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# IDEs and Editors
+# VS Code
+.vscode/
+*.code-workspace
+
+# PyCharm
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# OS generated files
+# macOS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Linux
+*~
+
+# FPGA/Vivado Specific
+# Vivado project files
+*.xpr
+*.hw
+*.sim
+*.cache/
+*.hwdef
+*.hdf
+*.bit
+*.bin
+*.ltx
+*.mcs
+*.prm
+*.bmm
+*.xdc
+*.tcl
+*.jou
+*.log
+
+# Vivado directories
+*_ip/
+*_ip_example/
+*_example/
+*_sim/
+*_tb/
+*_bd/
+*_hw/
+*_sw/
+
+# Synthesis and implementation results
+*.dcp
+*.edf
+*.edn
+*.ngc
+*.ngd
+*.ncd
+*.pcf
+*.ptwx
+*.rpx
+*.rpt
+*.sdf
+*.syr
+*.twx
+*.unroutes
+*.xpi
+*.xst
+
+# Simulation files
+*.vcd
+*.wdb
+*.wcfg
+*.do
+*.wave
+*.fsdb
+
+# IP cores and libraries
+ip/
+ip_repo/
+managed_ip_project/
+
+# Reports and logs
+reports/
+*_reports/
+*.html
+*.xml
+*_webtalk/
+
+# Temporary and backup files
+*.bak
+*.backup
+*.tmp
+*.temp
+*~
+
+# Documentation builds
+docs/build/
+docs/source/_build/
+
+# Test outputs
+test_outputs/
+test_results/
+*.json
+!test_algorithms/*.json  # Keep test vector JSONs
+
+# Generated RTL and Verilog files (outputs, not source)
+# generated_rtl/  # Commented out - we want to track generated RTL outputs
+*.sv
+*.v
+!generated_rtl/**/*.sv  # Allow .sv files in generated_rtl/
+!generated_rtl/**/*.v   # Allow .v files in generated_rtl/
+!generated_rtl/**/*.svh # Allow .svh files in generated_rtl/
+*_rtl/
+*_results/
+reports/
+test_outputs/
+
+# Compiled executables and binaries
+a.out
+*.exe
+*.out
+*.bin
+*.so
+*.dll
+*.dylib
+vvp
+
+# OpenAI API keys and secrets
+.env.local
+.env.production
+.env.staging
+secrets.json
+api_keys.txt
+
+# Personal configurations
+config.local.json
+settings.local.py
+
+# Backup files
+*.orig
+*.rej
+
+# Git
+.git/
+.gitignore
+
+# CI/CD
+.github/workflows/*.log
+*.log
+
+# Docker
+.dockerignore
+Dockerfile.*
+docker-compose.override.yml
+
+# Temporary project files
+temp/
+tmp/
+scratch/
