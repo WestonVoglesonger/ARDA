@@ -40,6 +40,7 @@ def write_artifact(workspace_token: str, path: str, content: str) -> Dict[str, A
     """
     workspace = _require_workspace(workspace_token)
     workspace.add_file(path, content)
+    print(f"DEBUG: write_artifact - wrote {path} ({len(content)} bytes) to workspace {workspace_token}")
     return {"path": path, "bytes_written": len(content)}
 
 

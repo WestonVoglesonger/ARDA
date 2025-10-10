@@ -17,6 +17,7 @@ class SpecContract(BaseModel):
     output_format: Dict[str, Any] = Field(description="width and fractional_bits")
     resource_budget: Dict[str, Any] = Field(description="lut, ff, dsp, bram budgets")
     verification_config: Dict[str, Any] = Field(description="test parameters")
+    confidence: float = Field(default=90.0, ge=0, le=100, description="Confidence level (0-100%)")
 
     class Config:
         extra = "allow"  # Allow additional fields for extensibility

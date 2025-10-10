@@ -3,7 +3,7 @@ Synthesis result models for ARDA.
 """
 
 from typing import Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class SynthResults(BaseModel):
@@ -18,3 +18,4 @@ class SynthResults(BaseModel):
     total_power_mw: Optional[float] = None
     slack_ns: float
     reports_path: str
+    confidence: float = Field(default=90.0, ge=0, le=100, description="Confidence level (0-100%)")

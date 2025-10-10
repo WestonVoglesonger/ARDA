@@ -73,7 +73,13 @@ async def test_orchestrator_executes_stage_sequence_with_quality_gates():
         handshake_protocol="ready_valid",
     )
     rtl_output = RTLConfig(
-        rtl_files=["rtl/core.sv"],
+        generated_files={
+            "params_svh": "package params; endpackage",
+            "algorithm_core_sv": "module core; endmodule",
+            "algorithm_top_sv": "module demo_top; endmodule"
+        },
+        file_paths=["rtl/params.svh", "rtl/core.sv", "rtl/demo_top.sv"],
+        rtl_files=["rtl/core.sv"],  # Deprecated field for backward compat
         params_file="rtl/params.svh",
         top_module="demo_top",
         lint_passed=True,

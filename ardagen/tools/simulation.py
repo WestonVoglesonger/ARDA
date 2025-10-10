@@ -19,6 +19,7 @@ def run_verification(context: Mapping[str, Any]) -> VerifyResults:
         max_abs_error=1.0e-6,
         rms_error=5.0e-7,
         functional_coverage=0.95,
+        confidence=90.0,
     )
 
 

@@ -189,6 +189,60 @@ class RTLStage(Stage):
 
 ## Domain Models
 
+### Confidence-Based Feedback
+
+All domain models now include a `confidence` field indicating the agent's certainty in the generated results:
+
+```python
+class SpecContract(BaseModel):
+    """Hardware contract specification."""
+    
+    name: str
+    description: str
+    clock_mhz_target: float
+    throughput_samples_per_cycle: int
+    input_format: Dict[str, Any]
+    output_format: Dict[str, Any]
+    resource_budget: Dict[str, Any]
+    verification_config: Dict[str, Any]
+    confidence: float = Field(default=90.0, ge=0, le=100, description="Confidence level (0-100%)")
+```
+
+### Confidence Fields
+
+All stage output models include confidence levels:
+
+- **SpecContract**: `confidence: float` - Confidence in hardware specification
+- **QuantConfig**: `confidence: float` - Confidence in quantization decisions
+- **MicroArchConfig**: `confidence: float` - Confidence in microarchitecture design
+- **RTLConfig**: `confidence: float` - Confidence in RTL generation quality
+- **LintResults**: `confidence: float` - Confidence in static analysis results
+- **VerifyResults**: `confidence: float` - Confidence in verification results
+- **SynthResults**: `confidence: float` - Confidence in synthesis results
+- **EvaluateResults**: `confidence: float` - Confidence in evaluation summary
+
+### Pipeline Confidence Logic
+
+The pipeline automatically checks confidence levels and only invokes the feedback agent when:
+
+1. Stage confidence < 80% (configurable threshold)
+2. Stage execution fails
+
+```python
+def _get_stage_confidence(self, stage_name: str) -> Optional[float]:
+    """Extract confidence level from stage result."""
+    if stage_name not in self.results:
+        return None
+    
+    result = self.results[stage_name]
+    if hasattr(result, 'confidence'):
+        return result.confidence
+    elif isinstance(result, dict) and 'confidence' in result:
+        return result['confidence']
+    
+    return None
+```
+
 ### SpecContract
 Hardware specification contract from algorithm analysis.
 

@@ -289,10 +289,16 @@ def extract_rtl_files(workspace_token: str, output_dir: str):
         print(f"Warning: Workspace {workspace_token} not found")
         return
 
+    print(f"DEBUG: extract_rtl_files - workspace {workspace_token} found")
+    print(f"DEBUG: extract_rtl_files - workspace has {len(workspace.list_files())} files:")
+    for file_path in workspace.list_files():
+        content = workspace.get_file(file_path)
+        print(f"DEBUG:   {file_path} ({len(content) if content else 0} bytes)")
+
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
 
-    rtl_extensions = {'.sv', '.svh', '.v', '.vh'}
+    rtl_extensions = {'.sv', '.svh', '.v', '.vh', '.xdc', '.tcl', '.sdc', '.qsf'}
     extracted_count = 0
 
     for file_path in workspace.list_files():

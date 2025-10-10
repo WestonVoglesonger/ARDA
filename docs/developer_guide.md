@@ -483,6 +483,171 @@ FUNCTION_MAP["my_tool"] = debug_tool
 
 ## Performance Optimization
 
+### Confidence-Based Feedback System
+
+The confidence-based feedback system significantly improves pipeline performance by reducing unnecessary agent calls. Understanding how to optimize and extend this system is crucial for developers.
+
+#### Implementation Details
+
+The feedback system is implemented in `ardagen/pipeline.py`:
+
+```python
+async def _apply_feedback(
+    self,
+    completed_stage: str,
+    run_inputs: Mapping[str, Any],
+    attempt: int,
+    error: Optional[str] = None,
+) -> Any:
+    if completed_stage not in self._feedback_stages:
+        return "continue"
+
+    # Check confidence level if stage completed successfully
+    if error is None:
+        confidence = self._get_stage_confidence(completed_stage)
+        if confidence is not None and confidence >= 80.0:
+            # High confidence - skip feedback
+            return "continue"
+
+    decision = await self._request_feedback(completed_stage, run_inputs, attempt, error)
+    if decision is None:
+        return "continue"
+
+    return self._interpret_feedback(decision, completed_stage)
+```
+
+#### Adding Confidence to New Domain Models
+
+When creating new domain models, always include a confidence field:
+
+```python
+from pydantic import BaseModel, Field
+
+class MyNewConfig(BaseModel):
+    """Configuration for my new stage."""
+    
+    # ... other fields ...
+    confidence: float = Field(
+        default=85.0, 
+        ge=0, 
+        le=100, 
+        description="Confidence level (0-100%)"
+    )
+    
+    class Config:
+        extra = "allow"
+```
+
+#### Customizing Confidence Thresholds
+
+To add custom confidence thresholds for specific stages:
+
+```python
+class Pipeline:
+    def __init__(self, confidence_thresholds: Optional[Dict[str, float]] = None):
+        self.confidence_thresholds = confidence_thresholds or {}
+        self.default_threshold = 80.0
+    
+    def _get_confidence_threshold(self, stage_name: str) -> float:
+        """Get confidence threshold for a specific stage."""
+        return self.confidence_thresholds.get(stage_name, self.default_threshold)
+    
+    async def _apply_feedback(self, ...):
+        # Use stage-specific threshold
+        threshold = self._get_confidence_threshold(completed_stage)
+        if confidence is not None and confidence >= threshold:
+            return "continue"
+        # ... rest of implementation
+```
+
+#### Optimizing Agent Confidence Outputs
+
+When implementing new agents, ensure they provide meaningful confidence levels:
+
+```python
+# In agent_configs.json
+{
+  "my_agent": {
+    "instructions": "Generate configuration with confidence assessment...",
+    "output_schema": {
+      "confidence": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 100,
+        "description": "Confidence level based on input clarity and output quality"
+      }
+    }
+  }
+}
+```
+
+#### Performance Monitoring
+
+Monitor feedback system performance:
+
+```python
+import logging
+
+class PerformanceMonitor:
+    def __init__(self):
+        self.feedback_calls = 0
+        self.confidence_skips = 0
+        self.total_stages = 0
+    
+    def stage_completed(self, stage_name: str, confidence: float, threshold: float):
+        self.total_stages += 1
+        if confidence >= threshold:
+            self.confidence_skips += 1
+            logging.info(f"Skipped feedback for {stage_name} (confidence: {confidence:.1f}%)")
+        else:
+            self.feedback_calls += 1
+            logging.info(f"Triggered feedback for {stage_name} (confidence: {confidence:.1f}%)")
+    
+    def get_stats(self):
+        skip_rate = self.confidence_skips / self.total_stages if self.total_stages > 0 else 0
+        return {
+            "total_stages": self.total_stages,
+            "feedback_calls": self.feedback_calls,
+            "confidence_skips": self.confidence_skips,
+            "skip_rate": skip_rate
+        }
+```
+
+#### Testing Confidence Logic
+
+Test confidence-based feedback behavior:
+
+```python
+import pytest
+from ardagen.pipeline import Pipeline
+
+@pytest.mark.asyncio
+async def test_confidence_based_feedback():
+    pipeline = Pipeline()
+    
+    # Test high confidence - should skip feedback
+    pipeline.results = {"spec": {"confidence": 90.0}}
+    feedback_decision = await pipeline._apply_feedback("spec", {}, 1)
+    assert feedback_decision == "continue"
+    
+    # Test low confidence - should trigger feedback
+    pipeline.results = {"spec": {"confidence": 75.0}}
+    feedback_decision = await pipeline._apply_feedback("spec", {}, 1)
+    assert feedback_decision != "continue"
+    
+    # Test stage failure - should trigger feedback
+    feedback_decision = await pipeline._apply_feedback("spec", {}, 1, error="Test error")
+    assert feedback_decision != "continue"
+```
+
+#### Best Practices
+
+1. **Set realistic confidence defaults**: Base on stage complexity and typical success rates
+2. **Monitor confidence trends**: Track which stages consistently report low confidence
+3. **Adjust thresholds gradually**: Start with default 80% and tune based on observed behavior
+4. **Document confidence rationale**: Explain why specific confidence levels are chosen
+5. **Test edge cases**: Ensure confidence logic handles missing or invalid values gracefully
+
 ### Profiling Pipeline Performance
 
 ```python

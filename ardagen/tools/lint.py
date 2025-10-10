@@ -56,6 +56,7 @@ def build_quant_config(context: Mapping[str, Any]) -> QuantConfig:
         },
         quantized_coefficients=[0.1, 0.2, 0.3],
         fxp_model_path="workspace/quant_model.py",
+        confidence=85.0,
     )
 
 
@@ -68,11 +69,73 @@ def build_microarch_config(context: Mapping[str, Any]) -> MicroArchConfig:
         dsp_usage_estimate=32,
         estimated_latency_cycles=12,
         handshake_protocol="ready_valid",
+        confidence=85.0,
     )
 
 
 def build_rtl_config(context: Mapping[str, Any]) -> RTLConfig:
     _emit_tool_event(context, "rtl", "rtl-generator", {"backend": "template"})
+    
+    # Write RTL files to workspace using the same mechanism as OpenAI agents
+    workspace_token = context.get("workspace_token")
+    if workspace_token:
+        from ..agents.tools import write_artifact
+        
+        # Write top-level module
+        top_content = """module algorithm_top (
+    input  wire        clk,
+    input  wire        rst_n,
+    input  wire [15:0] data_in,
+    input  wire        valid_in,
+    output reg  [15:0] data_out,
+    output reg         valid_out
+);
+
+    algorithm_core u_core (
+        .clk(clk),
+        .rst_n(rst_n),
+        .data_in(data_in),
+        .valid_in(valid_in),
+        .data_out(data_out),
+        .valid_out(valid_out)
+    );
+
+endmodule
+"""
+        write_artifact(workspace_token, "rtl/algorithm_top.sv", top_content)
+        
+        # Write core module
+        core_content = """module algorithm_core (
+    input  wire        clk,
+    input  wire        rst_n,
+    input  wire [15:0] data_in,
+    input  wire        valid_in,
+    output reg  [15:0] data_out,
+    output reg         valid_out
+);
+
+    // Simple passthrough implementation
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            data_out <= 16'h0;
+            valid_out <= 1'b0;
+        end else begin
+            data_out <= data_in;
+            valid_out <= valid_in;
+        end
+    end
+
+endmodule
+"""
+        write_artifact(workspace_token, "rtl/algorithm_core.sv", core_content)
+        
+        # Write parameters file
+        params_content = """// System parameters
+`define DATA_WIDTH 16
+`define CLOCK_FREQ 200_000_000
+"""
+        write_artifact(workspace_token, "rtl/params.svh", params_content)
+    
     return RTLConfig(
         rtl_files=[
             "rtl/algorithm_top.sv",
@@ -82,6 +145,7 @@ def build_rtl_config(context: Mapping[str, Any]) -> RTLConfig:
         top_module="algorithm_top",
         lint_passed=True,
         estimated_resources={"lut": 4000, "ff": 8000, "dsp": 24},
+        confidence=80.0,
     )
 
 
@@ -95,6 +159,7 @@ def run_static_checks(context: Mapping[str, Any]) -> LintResults:
         issues_list=[],
         overall_score=95.0,
         lint_clean=True,
+        confidence=85.0,
     )
 
 

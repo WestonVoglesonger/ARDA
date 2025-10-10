@@ -208,13 +208,23 @@ class Pipeline:
             if start_index >= len(self._stage_builders):
                 break
 
+        # Store state before resetting
+        workspace_token = self.workspace_token
+        results = dict(self.results)
+        stage_attempts = dict(self.stage_attempts)
+        feedback_history = list(self.feedback_history)
+        observability_events = list(self.observability.events)
+        
+        # Reset state for next run
+        self._reset_state()
+
         return {
             "success": True,
-            "workspace_token": self.workspace_token,
-            "results": self.results,
-            "stage_attempts": dict(self.stage_attempts),
-            "feedback": self.feedback_history,
-            "observability": self.observability.events,
+            "workspace_token": workspace_token,
+            "results": results,
+            "stage_attempts": stage_attempts,
+            "feedback": feedback_history,
+            "observability": observability_events,
         }
 
     # --- Internal helpers ---------------------------------------------------------
@@ -276,6 +286,13 @@ class Pipeline:
         if completed_stage not in self._feedback_stages:
             return "continue"
 
+        # Check confidence level if stage completed successfully
+        if error is None:
+            confidence = self._get_stage_confidence(completed_stage)
+            if confidence is not None and confidence >= 80.0:
+                # High confidence - skip feedback
+                return "continue"
+
         decision = await self._request_feedback(completed_stage, run_inputs, attempt, error)
         if decision is None:
             return "continue"
@@ -290,13 +307,23 @@ class Pipeline:
         error: Optional[str],
     ) -> Optional[FeedbackDecision]:
         feedback_context = self._build_feedback_context(stage, run_inputs, attempt, error)
+        feedback_attempt = self.stage_attempts.get("feedback", 0) + 1
+        self.stage_attempts["feedback"] = feedback_attempt
+        self.observability.stage_started("feedback", feedback_attempt)
         try:
             decision_raw = await self._run_agent_with_context("feedback", feedback_context)
-        except Exception:
+        except Exception as exc:
+            self.observability.stage_failed("feedback", str(exc))
             return None
 
-        decision = self._coerce_feedback(decision_raw)
+        try:
+            decision = self._coerce_feedback(decision_raw)
+        except Exception as exc:
+            self.observability.stage_failed("feedback", f"Invalid feedback payload: {exc}")
+            return None
+
         self.feedback_history.append(decision)
+        self.observability.stage_completed("feedback", decision)
         return decision
 
     def _interpret_feedback(self, decision: FeedbackDecision, stage: str) -> Any:
@@ -365,6 +392,10 @@ class Pipeline:
         for name, value in results.items():
             if isinstance(value, BaseModel):
                 serialised[name] = value.model_dump()
+                # Debug: Check quantized_coefficients specifically
+                if name == "quant" and "quantized_coefficients" in serialised[name]:
+                    coeffs = serialised[name]["quantized_coefficients"]
+                    print(f"DEBUG: Serializing quant stage - coeffs type: {type(coeffs)}, length: {len(coeffs) if coeffs else 'None'}")
             else:
                 serialised[name] = value
         return serialised
@@ -392,6 +423,19 @@ class Pipeline:
         if not self.workspace_token:
             return None
         return workspace_manager.get_workspace(self.workspace_token)
+
+    def _get_stage_confidence(self, stage_name: str) -> Optional[float]:
+        """Extract confidence level from stage result."""
+        if stage_name not in self.results:
+            return None
+        
+        result = self.results[stage_name]
+        if hasattr(result, 'confidence'):
+            return result.confidence
+        elif isinstance(result, dict) and 'confidence' in result:
+            return result['confidence']
+        
+        return None
 
 
 __all__ = ["Pipeline"]

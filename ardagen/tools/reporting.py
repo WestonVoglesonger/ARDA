@@ -34,6 +34,7 @@ def build_evaluation_summary(context: Mapping[str, Any]) -> EvaluateResults:
         ],
         bottlenecks=[],
         optimization_opportunities=[],
+        confidence=85.0,
     )
 
 

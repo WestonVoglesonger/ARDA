@@ -25,6 +25,7 @@ def run_synthesis(context: Mapping[str, Any]) -> SynthResults:
         total_power_mw=48.0,
         slack_ns=0.65,
         reports_path=f"{backend}_reports",
+        confidence=90.0,
     )
 
 

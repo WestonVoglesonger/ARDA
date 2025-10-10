@@ -3,7 +3,7 @@ Evaluation result models for ARDA.
 """
 
 from typing import List
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class EvaluateResults(BaseModel):
@@ -17,3 +17,4 @@ class EvaluateResults(BaseModel):
     recommendations: List[str]
     bottlenecks: List[str]
     optimization_opportunities: List[str]
+    confidence: float = Field(default=85.0, ge=0, le=100, description="Confidence level (0-100%)")

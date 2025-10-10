@@ -60,6 +60,12 @@ def _default_stage_outputs():
         ]),
         'rtl': deque([
             RTLConfig(
+                generated_files={
+                    "params_svh": "package params; endpackage",
+                    "algorithm_core_sv": "module core; endmodule",
+                    "algorithm_top_sv": "module demo_top; endmodule"
+                },
+                file_paths=["rtl/params.svh", "rtl/core.sv", "rtl/top.sv"],
                 rtl_files=["rtl/core.sv", "rtl/top.sv"],
                 params_file="rtl/params.svh",
                 top_module="demo_top",
@@ -132,16 +138,7 @@ def test_pipeline_retries_synth(monkeypatch):
     pipeline = Pipeline()
     stage_outputs = _default_stage_outputs()
     feedback_decisions = deque([
-        {"action": "continue"},
-        {"action": "continue"},
-        {"action": "continue"},
-        {"action": "continue"},
-        {"action": "continue"},
-        {"action": "continue"},
         {"action": "retry_synth", "target_stage": "synth", "guidance": "Improve timing."},
-        {"action": "continue"},
-        {"action": "continue"},
-        {"action": "continue"},
         {"action": "continue"},
     ])
     stage_calls = defaultdict(int)
@@ -167,10 +164,10 @@ def test_pipeline_retries_synth(monkeypatch):
     result = asyncio.run(pipeline.run(_sample_bundle()))
 
     assert result["success"] is True
-    assert pipeline.stage_attempts['synth'] == 2
+    assert result["stage_attempts"]["synth"] == 2
     assert stage_calls['synth'] == 2
-    assert pipeline.results['synth'].timing_met is True
-    assert pipeline.results['static_checks'].overall_score == 95.0
+    assert result["results"]['synth'].timing_met is True
+    assert result["results"]['static_checks'].overall_score == 95.0
 
 
 def test_pipeline_feedback_abort(monkeypatch):
@@ -190,11 +187,6 @@ def test_pipeline_feedback_abort(monkeypatch):
     ])
 
     feedback_decisions = deque([
-        {"action": "continue"},
-        {"action": "continue"},
-        {"action": "continue"},
-        {"action": "continue"},
-        {"action": "continue"},
         {"action": "abort", "guidance": "Verification failed."},
     ])
     stage_calls = defaultdict(int)
@@ -221,6 +213,6 @@ def test_pipeline_feedback_abort(monkeypatch):
 
     assert result["success"] is False
     assert result["error"] == "Pipeline aborted by feedback agent"
-    assert 'synth' not in pipeline.results
-    assert pipeline.stage_attempts['verification'] == 1
+    assert 'synth' not in result["results"]
+    assert result["stage_attempts"]['verification'] == 1
     assert stage_calls['verification'] == 1

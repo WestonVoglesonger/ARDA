@@ -246,8 +246,7 @@ ARDA supports multiple FPGA synthesis backends (legacy `alg2sv` CLI remains avai
 arda examples/bpf16_bundle.txt --synthesis-backend auto
 
 # Xilinx Vivado (for Xilinx 7-series FPGAs)
-arda examples/bpf16_bundle.txt --synthesis-backend vivado --fpga-family xc7a100t
-
+he
 # Open-source Yosys (for iCE40/ECP5 FPGAs)
 arda examples/bpf16_bundle.txt --synthesis-backend yosys --fpga-family ice40hx8k
 
