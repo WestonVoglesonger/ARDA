@@ -302,7 +302,7 @@
           "type": "array",
           "items": {
             "type": "string"
-        },
+          },
           "description": "Paths where files will be written",
           "minItems": 3,
           "maxItems": 15
@@ -340,7 +340,7 @@
     },
     "verify_agent": {
       "name": "Verify Agent",
-      "instructions": "Run functional verification against golden reference. Use code interpreter to execute Python golden model and compare with RTL simulation results. Report pass/fail and error metrics.",
+      "instructions": "You are the Verification Agent. Your mission is to prove that the generated RTL honors the specification, protocol rules, and adaptive-behaviour guarantees.\n\n## Inputs & Tools\n- Use `read_source` to inspect algorithm bundles, RTL files, and prior results.\n- Use `web_search` when you need ready/valid protocol references, simulator tips, or numerical-method guidance. Cite the sources you rely on.\n- Use `code_interpreter` to build and execute golden models, generate constrained-random stimuli, compute metrics, and post-process simulation logs.\n- Use `run_simulation` to execute RTL with the stimuli you generate (Icarus/Verilator).\n\n## Required Workflow\n1. **Plan the campaign** – Summarise which test suites you will run (functional, protocol, adaptive, stress). Reference spec targets and any online guidance you consulted.\n2. **Prepare artefacts** – With `code_interpreter`, generate structured test vectors (JSON/CSV), golden reference outputs, and reusable checker helpers. Store artefact paths in your final JSON.\n3. **Functional suite** – Run forward-path checks covering >1024 samples using the golden model for comparison. Report error metrics.\n4. **Protocol suite** – Exercise backpressure, bubbles, stall/restart, and ready/valid corner cases. Add SystemVerilog assertions or scoreboard logic when running `run_simulation`. Capture any violations.\n5. **Adaptive/algorithm-specific suite** – For adaptive designs, check convergence speed, coefficient stability, and overflow behaviour. For FFT/Conv2D/etc., create domain-specific checks (e.g., spectrum error, PSNR).\n6. **Stress/robustness suite** – Randomise inputs, toggle resets mid-stream, vary precision. Note any unexpected warnings.\n7. **Analysis** – Use `code_interpreter` to parse simulation logs, compute protocol metrics, and aggregate suite-level pass/fail data.\n\n## Reporting Requirements\nReturn structured JSON including: overall totals, per-suite breakdown, protocol violations (if any), undefined/X-state sightings, generated artefacts, source citations, and confidence. Clearly describe any failures and recommended fixes.\n\nAlways fail the stage (`all_passed=false`) when a critical issue is found, and provide explicit guidance (in `notes`) for remediation.",
       "tools": [
         {
           "type": "function",
@@ -348,13 +348,18 @@
           "description": "Read test vectors and RTL files"
         },
         {
+          "type": "function",
+          "name": "web_search",
+          "description": "Look up protocol specs, verification methodologies, or reference material"
+        },
+        {
           "type": "code_interpreter",
-          "description": "Run golden model and compute verification metrics"
+          "description": "Run golden models, generate stimuli, and analyse logs"
         },
         {
           "type": "function",
           "name": "run_simulation",
-          "description": "Execute RTL simulation (if available)"
+          "description": "Execute RTL simulation (iverilog/verilator) with custom stimuli"
         }
       ],
       "output_schema": {
@@ -383,6 +388,9 @@
               },
               "error": {
                 "type": "number"
+              },
+              "suite": {
+                "type": "string"
               }
             }
           }
@@ -395,6 +403,68 @@
         },
         "functional_coverage": {
           "type": "number"
+        },
+        "test_suites": {
+          "type": "object",
+          "description": "Per-suite verification summary",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "passed": {
+                "type": "boolean"
+              },
+              "tests_run": {
+                "type": "number"
+              },
+              "failures": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "metrics": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "number"
+                }
+              },
+              "notes": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "protocol_violations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "undefined_states": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "artifacts": {
+          "type": "array",
+          "description": "File paths or artefact identifiers produced during verification",
+          "items": {
+            "type": "string"
+          }
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "sources": {
+          "type": "array",
+          "description": "External resources consulted (URLs, documents)",
+          "items": {
+            "type": "string"
+          }
         },
         "confidence": {
           "type": "number",

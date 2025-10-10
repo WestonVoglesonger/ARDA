@@ -171,18 +171,13 @@ class OpenAIAgentRunner(PipelineAgentRunner):
         model_params = get_model_params_for_agent(self._model_key_for_stage(stage))
         model = model_params.pop("model")
 
-        tools, tool_map, tool_requirements, interpreter_requested = self._build_tool_definitions(agent_cfg)
+        tools, tool_map, tool_requirements = self._build_tool_definitions(agent_cfg)
         if os.getenv("ARDA_DEBUG_EXTRACTION") and tools:
             try:
                 print(f"DEBUG: Tools for stage '{stage}': {json.dumps(tools, indent=2)}")
             except Exception:
                 print(f"DEBUG: Tools for stage '{stage}': {tools}")
         instructions = agent_cfg["instructions"]
-        if interpreter_requested:
-            instructions += (
-                "\n\nIMPORTANT: The code interpreter tool is not available in this runtime. "
-                "Complete the task using reasoning only and do not request the code interpreter."
-            )
 
         json_schema = self._build_json_schema(agent_key, agent_cfg)
         messages = self._build_messages(instructions, stage, context, json_schema)
@@ -307,7 +302,6 @@ class OpenAIAgentRunner(PipelineAgentRunner):
         tool_defs = []
         tool_functions = {}
         tool_requirements: Dict[str, Dict[str, Any]] = {}
-        interpreter_requested = False
         for tool in agent_cfg.get("tools", []):
             if tool["type"] == "function":
                 tool_name = tool["name"]
@@ -353,9 +347,8 @@ class OpenAIAgentRunner(PipelineAgentRunner):
                     "parameters": parameters,
                 }
             elif tool["type"] == "code_interpreter":
-                interpreter_requested = True
-                continue
-        return tool_defs, tool_functions, tool_requirements, interpreter_requested
+                tool_defs.append({"type": "code_interpreter"})
+        return tool_defs, tool_functions, tool_requirements
 
     def _build_json_schema(self, agent_key: str, agent_cfg: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         output_schema = agent_cfg.get("output_schema")
