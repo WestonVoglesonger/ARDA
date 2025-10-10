@@ -71,11 +71,14 @@ arda/
 │   └── workspace.py           # Virtual workspace management
 ├── docs/                      # Documentation
 │   ├── adr/                   # Architecture decision records
+│   ├── architecture/          # Architecture proposals and plans
+│   ├── migrations/            # Migration documentation
+│   ├── reviews/               # RTL review analyses
 │   ├── architecture.md        # Technical architecture
 │   ├── user_guide.md          # User documentation
 │   └── developer_guide.md     # This file
-├── examples/                  # Example bundles
 ├── generated_rtl/             # Generated RTL output
+├── test_algorithms/           # Example algorithm bundles with test vectors
 └── tests/                     # Test suite
 ```
 

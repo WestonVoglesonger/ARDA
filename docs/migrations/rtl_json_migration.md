@@ -87,14 +87,14 @@ Successfully migrated RTL generation from function calling (write_artifact) to J
 - [ ] Workspace file writing succeeds
 
 ### Integration Tests
-- [ ] Run pipeline with examples/bpf16_bundle.txt
+- [ ] Run pipeline with test_algorithms/bpf16_bundle.txt
 - [ ] Run pipeline with test_algorithms/complex_adaptive_filter/
 - [ ] Verify 3 RTL files written to workspace
 - [ ] Confirm files contain valid SystemVerilog
 - [ ] Check JSON response has all metadata
 
 ### Validation Steps
-1. Run: `python -m ardagen.cli examples/bpf16_bundle.txt --extract-rtl generated_rtl/test/`
+1. Run: `python -m ardagen.cli test_algorithms/bpf16_bundle.txt --extract-rtl generated_rtl/test/`
 2. Verify workspace shows 3 files written with byte counts
 3. Check generated files for basic syntax (module/endmodule pairs)
 4. Validate bit widths match quant config

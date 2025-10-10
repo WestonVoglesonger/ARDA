@@ -9,7 +9,7 @@
 ## ⚠️ PREREQUISITE: Flexible RTL Architecture
 
 **Before implementing these verification improvements, see:**
-📄 **`FLEXIBLE_RTL_ARCHITECTURE.md`**
+📄 **`flexible_rtl_architecture.md`** (in this directory)
 
 **Why:** Evidence from two designs (Adaptive Filter, Conv2D) shows that forcing all algorithms into a fixed 3-file template causes monolithic code that:
 - Creates architectural bugs (40-60% of issues)
@@ -1041,7 +1041,7 @@ VERIFICATION_LEVELS = {
 #### 1. Regression Testing
 ```bash
 # Run against known-good designs
-python -m ardagen.cli examples/simple_fir.txt --verify-level comprehensive
+python -m ardagen.cli test_algorithms/bpf16_bundle.txt --verify-level comprehensive
 
 # Run against known-buggy designs (create test cases)
 python -m ardagen.cli test_cases/buggy_backpressure.txt --expect-failure

@@ -99,7 +99,7 @@ To test the fixes, run:
 
 ```bash
 ARDA_DEBUG_EXTRACTION=1 ARDA_DUMP_OPENAI_RESPONSE=1 python -m ardagen.cli \
-  /Users/westonvoglesonger/Projects/ALG2SV/examples/complex_adaptive_filter_bundle.txt \
+  test_algorithms/complex_adaptive_filter/complex_adaptive_filter_bundle.txt \
   --synthesis-backend vivado \
   --fpga-family xc7a100t \
   --verbose \

@@ -243,25 +243,26 @@ ARDA supports multiple FPGA synthesis backends (legacy `alg2sv` CLI remains avai
 
 ```bash
 # Auto-detect best available backend
-arda examples/bpf16_bundle.txt --synthesis-backend auto
+arda test_algorithms/bpf16_bundle.txt --synthesis-backend auto
 
 # Xilinx Vivado (for Xilinx 7-series FPGAs)
-he
+arda test_algorithms/bpf16_bundle.txt --synthesis-backend vivado --fpga-family xc7a100t
+
 # Open-source Yosys (for iCE40/ECP5 FPGAs)
-arda examples/bpf16_bundle.txt --synthesis-backend yosys --fpga-family ice40hx8k
+arda test_algorithms/bpf16_bundle.txt --synthesis-backend yosys --fpga-family ice40hx8k
 
 # Experimental SymbiFlow (for Xilinx 7-series)
-arda examples/bpf16_bundle.txt --synthesis-backend symbiflow --fpga-family xc7a100t
+arda test_algorithms/bpf16_bundle.txt --synthesis-backend symbiflow --fpga-family xc7a100t
 ```
 
 ### 4. Test with Example Algorithm
 
 ```bash
 # Run the BPF16 filter example
-arda examples/bpf16_bundle.txt --verbose --workspace-info
+arda test_algorithms/bpf16_bundle.txt --verbose --workspace-info
 
 # Or use the module directly
-python -m alg2sv.cli examples/bpf16_bundle.txt --verbose
+python -m alg2sv.cli test_algorithms/bpf16_bundle.txt --verbose
 ```
 
 ### 5. Input Algorithm Format

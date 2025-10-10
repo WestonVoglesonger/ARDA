@@ -630,7 +630,7 @@ def test_file_writing_dynamic():
 2. ✅ Integration test:
 ```bash
 # Test with existing design
-python -m ardagen.cli examples/conv2d_bundle.txt --verbose
+python -m ardagen.cli test_algorithms/conv2d_bundle.txt --verbose
 
 # Expected: Agent generates more modular design
 # Should see: 4-8 files instead of 3
@@ -714,7 +714,7 @@ If issues occur:
 
 ## Integration with Verification Improvements
 
-This change is **Phase 0** for `PIPELINE_VERIFICATION_IMPROVEMENTS.md`.
+This change is **Phase 0** for `pipeline_verification_improvements.md` (in this directory).
 
 ### How They Connect:
 
