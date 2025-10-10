@@ -34,16 +34,6 @@ def read_source(workspace_token: str, path: str) -> Dict[str, Any]:
     return {"path": path, "content": content}
 
 
-def write_artifact(workspace_token: str, path: str, content: str) -> Dict[str, Any]:
-    """
-    Write or overwrite a file in the virtual workspace.
-    """
-    workspace = _require_workspace(workspace_token)
-    workspace.add_file(path, content)
-    print(f"DEBUG: write_artifact - wrote {path} ({len(content)} bytes) to workspace {workspace_token}")
-    return {"path": path, "bytes_written": len(content)}
-
-
 def submit_synth_job(
     repo: str,
     ref: str,
@@ -341,7 +331,6 @@ def _require_workspace(workspace_token: str):
 FUNCTION_MAP = {
     "ingest_from_bundle": ingest_from_bundle,
     "read_source": read_source,
-    "write_artifact": write_artifact,
     "submit_synth_job": submit_synth_job,
     "fetch_synth_results": fetch_synth_results,
     "run_simulation": run_simulation,

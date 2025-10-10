@@ -23,9 +23,6 @@ class RTLConfig(BaseModel):
     # Optional fields
     lint_passed: bool = False
     params_file: Optional[str] = None
-    
-    # Deprecated field (for backward compatibility)
-    rtl_files: Optional[List[str]] = None
 
     class Config:
         extra = "allow"
