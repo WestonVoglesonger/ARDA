@@ -8,8 +8,7 @@ from .quant_stage import QuantStage
 from .microarch_stage import MicroArchStage
 from .architecture_stage import ArchitectureStage
 from .rtl_stage import RTLStage
-from .lint_stage import StaticChecksStage
-from .simulation_stage import VerificationStage
+from .verification_stage import VerificationStage
 from .synth_stage import SynthStage
 from .evaluate_stage import EvaluateStage
 
@@ -21,7 +20,6 @@ __all__ = [
     "MicroArchStage",
     "ArchitectureStage",
     "RTLStage",
-    "StaticChecksStage",
     "VerificationStage",
     "SynthStage",
     "EvaluateStage",

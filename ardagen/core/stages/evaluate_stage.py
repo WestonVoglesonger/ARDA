@@ -23,8 +23,9 @@ class EvaluateStage(Stage):
     """Aggregate metrics across stages for final scoring."""
 
     name = "evaluate"
-    dependencies = ("spec", "quant", "microarch", "rtl", "static_checks", "verification", "synth")
+    dependencies = ("spec", "quant", "microarch", "rtl", "verification", "synth")
     output_model = EvaluateResults
+    # Note: static_checks removed - lint results now in verification.lint_results
 
     def gather_inputs(self, context: StageContext) -> Dict[str, Any]:
         inputs = super().gather_inputs(context)
@@ -33,7 +34,6 @@ class EvaluateStage(Stage):
             "quant": QuantConfig,
             "microarch": MicroArchConfig,
             "rtl": RTLConfig,
-            "static_checks": LintResults,
             "verification": VerifyResults,
             "synth": SynthResults,
         }

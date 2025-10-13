@@ -43,6 +43,7 @@ dependencies = [
     "pydantic>=2.0.0",
     "typing-extensions>=4.0.0",
     "ddgs>=9.0.0",
+    "python-dotenv>=1.0.0",
 ]
 
 [project.urls]
@@ -87,3 +88,18 @@ testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
+markers = [
+    "openai: Tests that call OpenAI API (may incur costs)",
+    "openai_spec: Spec stage tests",
+    "openai_quant: Quant stage tests",
+    "openai_microarch: Microarch stage tests",
+    "openai_architecture: Architecture stage tests",
+    "openai_rtl: RTL stage tests",
+    "openai_verification: Verification stage tests",
+    "openai_synth: Synth stage tests",
+    "openai_evaluate: Evaluate stage tests",
+    "openai_conv2d: Conv2D algorithm tests",
+    "openai_fft256: FFT256 algorithm tests",
+    "openai_bpf16: BPF16 algorithm tests",
+    "openai_adaptive_filter: Adaptive filter algorithm tests"
+]

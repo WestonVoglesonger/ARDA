@@ -12,7 +12,7 @@ class SpecContract(BaseModel):
     name: str
     description: str
     clock_mhz_target: float
-    throughput_samples_per_cycle: int
+    throughput_samples_per_cycle: float
     input_format: Dict[str, Any] = Field(description="width and fractional_bits")
     output_format: Dict[str, Any] = Field(description="width and fractional_bits")
     resource_budget: Dict[str, Any] = Field(description="lut, ff, dsp, bram budgets")

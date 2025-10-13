@@ -14,15 +14,14 @@ class SynthStage(Stage):
     """Run synthesis and ensure timing goals are met."""
 
     name = "synth"
-    dependencies = ("rtl", "static_checks", "verification")
+    dependencies = ("rtl", "verification")
     output_model = SynthResults
+    # Note: static_checks removed - lint results now in verification.lint_results
 
     def gather_inputs(self, context: StageContext) -> Dict[str, Any]:
         inputs = super().gather_inputs(context)
         if not isinstance(inputs["rtl"], RTLConfig):
             raise TypeError("SynthStage requires RTLConfig from 'rtl' dependency.")
-        if not isinstance(inputs["static_checks"], LintResults):
-            raise TypeError("SynthStage requires LintResults from 'static_checks' dependency.")
         if not isinstance(inputs["verification"], VerifyResults):
             raise TypeError("SynthStage requires VerifyResults from 'verification' dependency.")
         return inputs

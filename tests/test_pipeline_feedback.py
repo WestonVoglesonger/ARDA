@@ -125,17 +125,6 @@ def _default_stage_outputs():
                 reports_path="synth/run2",
             ),
         ]),
-        'static_checks': deque([
-            LintResults(
-                syntax_errors=0,
-                style_warnings=1,
-                lint_violations=0,
-                critical_issues=0,
-                issues_list=[],
-                overall_score=95.0,
-                lint_clean=True,
-            )
-        ]),
         'verification': deque([
             VerifyResults(
                 tests_total=20,
@@ -145,6 +134,7 @@ def _default_stage_outputs():
                 max_abs_error=1.0e-6,
                 rms_error=5.0e-7,
                 functional_coverage=0.95,
+                lint_results={"lint_clean": True, "issues": []}
             )
         ]),
         'evaluate': deque([
@@ -195,7 +185,6 @@ def test_pipeline_retries_synth(monkeypatch):
     assert result["stage_attempts"]["synth"] == 2
     assert stage_calls['synth'] == 2
     assert result["results"]['synth'].timing_met is True
-    assert result["results"]['static_checks'].overall_score == 95.0
 
 
 def test_pipeline_feedback_abort(monkeypatch):
@@ -211,6 +200,7 @@ def test_pipeline_feedback_abort(monkeypatch):
             max_abs_error=0.1,
             rms_error=0.05,
             functional_coverage=0.6,
+            lint_results={"lint_clean": True, "issues": []}
         )
     ])
 

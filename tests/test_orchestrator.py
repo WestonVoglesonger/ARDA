@@ -10,7 +10,6 @@ from ardagen.core.stages import (
     MicroArchStage,
     ArchitectureStage,
     RTLStage,
-    StaticChecksStage,
     VerificationStage,
     SynthStage,
     EvaluateStage,
@@ -129,6 +128,17 @@ async def test_orchestrator_executes_stage_sequence_with_quality_gates():
         max_abs_error=1.0e-6,
         rms_error=5.0e-7,
         functional_coverage=0.95,
+        confidence=90.0,
+        lint_results={
+            "syntax_errors": 0,
+            "style_warnings": 1,
+            "lint_violations": 0,
+            "critical_issues": 0,
+            "issues_list": [{"severity": "warning", "message": "Verilator not found - skipping lint"}],
+            "overall_score": 95.0,
+            "lint_clean": True,
+            "confidence": 50.0
+        }
     )
     synth_output = SynthResults(
         fmax_mhz=250.0,
@@ -159,7 +169,21 @@ async def test_orchestrator_executes_stage_sequence_with_quality_gates():
             "microarch": microarch_output,
             "architecture": architecture_output,
             "rtl": rtl_output,
-            "static_checks": lint_output,
+            "test_generation": {
+                "test_vectors": [{"input": i} for i in range(10)],
+                "golden_outputs": [{"output": i*2} for i in range(10)],
+                "test_count": 10
+            },
+            "simulation": {
+                "tests_total": 10,
+                "tests_passed": 10,
+                "all_passed": True,
+                "mismatches": [],
+                "max_abs_error": 1.0e-6,
+                "rms_error": 5.0e-7,
+                "functional_coverage": 0.95,
+                "confidence": 90.0
+            },
             "verification": verification_output,
             "synth": synth_output,
             "evaluate": evaluate_output,
@@ -172,7 +196,6 @@ async def test_orchestrator_executes_stage_sequence_with_quality_gates():
             MicroArchStage(),
             ArchitectureStage(),
             RTLStage(),
-            StaticChecksStage(),
             VerificationStage(),
             SynthStage(),
             EvaluateStage(),
@@ -188,7 +211,6 @@ async def test_orchestrator_executes_stage_sequence_with_quality_gates():
         "microarch",
         "architecture",
         "rtl",
-        "static_checks",
         "verification",
         "synth",
         "evaluate",
@@ -198,7 +220,6 @@ async def test_orchestrator_executes_stage_sequence_with_quality_gates():
     assert result.get("microarch") == microarch_output
     assert result.get("architecture") == architecture_output
     assert result.get("rtl") == rtl_output
-    assert result.get("static_checks") == lint_output
     assert result.get("verification") == verification_output
     assert result.get("synth") == synth_output
     assert result.get("evaluate") == evaluate_output
@@ -211,6 +232,7 @@ async def test_orchestrator_executes_stage_sequence_with_quality_gates():
     assert "quant" in strategy.calls["architecture"]["inputs"]
     assert "microarch" in strategy.calls["architecture"]["inputs"]
     assert "architecture" in strategy.calls["rtl"]["inputs"]
-    assert "rtl" in strategy.calls["static_checks"]["inputs"]
-    assert "static_checks" in strategy.calls["synth"]["inputs"]
+    # Verification stage orchestrates sub-stages internally
+    assert "rtl" in strategy.calls["test_generation"]["inputs"]["stage_inputs"]
+    assert "rtl" in strategy.calls["simulation"]["inputs"]["stage_inputs"]
     assert "verification" in strategy.calls["synth"]["inputs"]

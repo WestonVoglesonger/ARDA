@@ -11,6 +11,8 @@ import os
 import time
 from typing import Any, Dict, Mapping, Optional, Set
 
+from dotenv import load_dotenv
+
 from ..domain import FeedbackDecision
 from ..model_config import get_model_params_for_agent
 from ..runtime.agent_runner import PipelineAgentRunner
@@ -50,7 +52,8 @@ class OpenAIAgentRunner(PipelineAgentRunner):
         "microarch": "microarch_agent",
         "architecture": "architecture_agent",
         "rtl": "rtl_agent",
-        "verification": "verify_agent",
+        "test_generation": "testgen_agent",
+        "simulation": "simulation_agent",
         "synth": "synth_agent",
     }
 
@@ -74,6 +77,12 @@ class OpenAIAgentRunner(PipelineAgentRunner):
         "rtl": {  # flexible, varies by your agent schema
             "verilog", "files", "modules", "top_module", "constraints", "confidence"
         },
+        "test_generation": {
+            "test_vectors", "golden_outputs", "test_count"
+        },
+        "simulation": {
+            "tests_total", "tests_passed", "all_passed", "max_abs_error", "rms_error"
+        },
         "verification": {
             "testbench", "stimulus", "checkers", "metrics", "confidence"
         },
@@ -86,7 +95,7 @@ class OpenAIAgentRunner(PipelineAgentRunner):
     }
 
     # For stages that expect a dict, not a list
-    _EXPECTS_OBJECT: Set[str] = {"spec", "quant", "microarch", "architecture", "rtl", "verification", "synth", "feedback"}
+    _EXPECTS_OBJECT: Set[str] = {"spec", "quant", "microarch", "architecture", "rtl", "test_generation", "simulation", "verification", "synth", "feedback"}
 
     _FEEDBACK_SCHEMA = {
         "name": "feedback_decision",
@@ -103,7 +112,10 @@ class OpenAIAgentRunner(PipelineAgentRunner):
                         "retry_microarch",
                         "retry_architecture",
                         "retry_rtl",
-                        "retry_verification",
+                        "retry_verify",
+                        "retry_lint",
+                        "retry_test_generation",
+                        "retry_simulation",
                         "retry_synth",
                         "tune_microarch",
                     ],
@@ -124,6 +136,9 @@ class OpenAIAgentRunner(PipelineAgentRunner):
         config: Optional[Dict[str, Any]] = None,
         fallback_runner: Optional[PipelineAgentRunner] = None,
     ) -> None:
+        # Load environment variables from .env file
+        load_dotenv()
+        
         try:
             from openai import OpenAI
         except ImportError as exc:
@@ -187,7 +202,8 @@ class OpenAIAgentRunner(PipelineAgentRunner):
         if os.getenv("ARDA_DEBUG_EXTRACTION") and tools:
             print(f"DEBUG: About to call OpenAI with tools:")
             for tool in tools:
-                print(f"  Tool: {tool['name']}")
+                tool_name = tool.get('name', tool.get('type', 'unknown'))
+                print(f"  Tool: {tool_name}")
                 if 'function' in tool:
                     func = tool['function']
                     print(f"    Has 'parameters'? {('parameters' in func)}")
@@ -212,11 +228,18 @@ class OpenAIAgentRunner(PipelineAgentRunner):
 
         response = self._response_handler.handle_required_actions(response, context, tool_map, tool_requirements)
         
-        # If the agent used tools but didn't return text/JSON, prompt for final response
+        # If the agent used tools but didn't return text/JSON, try to construct a response
         if tools and self._response_handler.response_is_empty(response):
             if os.getenv("ARDA_DEBUG_EXTRACTION"):
-                print(f"DEBUG: Agent for stage '{stage}' completed tools but returned no output. Prompting for JSON response.")
-            response = self._response_handler.prompt_for_final_response(response, stage, json_schema, model, model_params)
+                print(f"DEBUG: Agent for stage '{stage}' completed tools but returned no output. Attempting to construct response.")
+            constructed_response = self._response_handler.construct_response_from_tools(response, stage, json_schema)
+            if constructed_response:
+                response = constructed_response
+            else:
+                # Fallback to prompting for final response
+                if os.getenv("ARDA_DEBUG_EXTRACTION"):
+                    print(f"DEBUG: Failed to construct response, prompting for final response.")
+                response = self._response_handler.prompt_for_final_response(response, stage, json_schema, model, model_params)
         
         # Extract JSON payload from response
         payload = self._json_parser.extract_response_payload(response, stage)
@@ -347,7 +370,11 @@ class OpenAIAgentRunner(PipelineAgentRunner):
                     "parameters": parameters,
                 }
             elif tool["type"] == "code_interpreter":
-                tool_defs.append({"type": "code_interpreter"})
+                # Pass through container configuration if present
+                tool_def = {"type": "code_interpreter"}
+                if "container" in tool:
+                    tool_def["container"] = tool["container"]
+                tool_defs.append(tool_def)
         return tool_defs, tool_functions, tool_requirements
 
     def _build_json_schema(self, agent_key: str, agent_cfg: Dict[str, Any]) -> Optional[Dict[str, Any]]:

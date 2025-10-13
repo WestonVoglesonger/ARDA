@@ -11,8 +11,8 @@ AGENT_MODELS: Dict[str, str] = {
     'spec': 'gpt-5-nano',
     'quant': 'gpt-5-nano', 
     'microarch': 'gpt-5-nano',
-    'static_checks': 'gpt-5-nano',
-    'verification': 'gpt-5-nano',
+    'test_generation': 'gpt-5-nano',
+    'simulation': 'gpt-5-nano',
     'evaluate': 'gpt-5-nano',
     'feedback': 'gpt-5-nano',
     
@@ -24,7 +24,7 @@ AGENT_MODELS: Dict[str, str] = {
 }
 
 # Fallback model if GPT-5 is not available
-FALLBACK_MODEL = 'gpt-4.1'
+FALLBACK_MODEL = 'gpt-5-nano'
 
 def get_model_for_agent(agent_name: str) -> str:
     """Get the model name for a specific agent."""

@@ -2,7 +2,7 @@
 Verification-related result models for ARDA.
 """
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 
 
@@ -17,6 +17,9 @@ class VerifyResults(BaseModel):
     rms_error: float
     functional_coverage: float
     confidence: float = Field(default=90.0, ge=0, le=100, description="Confidence level (0-100%)")
+    
+    # NEW: Include lint results from Phase 1
+    lint_results: Optional[Dict[str, Any]] = None
 
 
 class LintResults(BaseModel):

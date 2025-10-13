@@ -34,6 +34,62 @@ def read_source(workspace_token: str, path: str) -> Dict[str, Any]:
     return {"path": path, "content": content}
 
 
+def extract_module_ports(rtl_content: str, module_name: str) -> Dict[str, Any]:
+    """
+    Extract port information from SystemVerilog module content.
+
+    Args:
+        rtl_content: The SystemVerilog source code
+        module_name: Name of the module to analyze
+
+    Returns:
+        Dict containing port information with types, directions, and widths
+    """
+    import re
+
+    # Find the module declaration
+    module_pattern = rf'module\s+{re.escape(module_name)}\s*\((.*?)\);'
+    match = re.search(module_pattern, rtl_content, re.DOTALL)
+
+    if not match:
+        return {"error": f"Module '{module_name}' not found"}
+
+    ports_section = match.group(1)
+
+    # Parse port declarations
+    ports = []
+    port_lines = [line.strip() for line in ports_section.split(',') if line.strip()]
+
+    for line in port_lines:
+        # Skip empty lines
+        if not line:
+            continue
+
+        # Parse port direction and type
+        # Examples: input logic [7:0] data_in, output logic valid_out
+        port_match = re.match(r'(input|output|inout)\s+(\w+(?:\s*\[\s*\d+(?::\d+)?\s*\])?)?\s*(\w+)', line.strip())
+        if port_match:
+            direction, port_type, port_name = port_match.groups()
+            port_type = port_type or "logic"  # Default to logic if not specified
+
+            # Extract width if present
+            width_match = re.search(r'\[([^\]]+)\]', port_type)
+            width = width_match.group(1) if width_match else "1"
+
+            ports.append({
+                "name": port_name,
+                "direction": direction,
+                "type": port_type.replace(f'[{width}]', '').strip() if width_match else port_type,
+                "width": width
+            })
+
+    return {
+        "module_name": module_name,
+        "ports": ports,
+        "port_count": len(ports)
+    }
+
+
 def submit_synth_job(
     repo: str,
     ref: str,
@@ -382,6 +438,7 @@ FUNCTION_MAP = {
     "fetch_synth_results": fetch_synth_results,
     "run_simulation": run_simulation,
     "web_search": web_search,
+    "extract_module_ports": extract_module_ports,
 }
 
 
@@ -405,6 +462,7 @@ __all__ = [
     "fetch_synth_results",
     "run_simulation",
     "web_search",
+    "extract_module_ports",
     "FUNCTION_MAP",
     "call_tool",
 ]

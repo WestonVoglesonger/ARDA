@@ -37,7 +37,15 @@ class DefaultAgentRunner:
         self._registry = registry or create_default_registry()
 
     async def run_stage(self, stage: str, context: Mapping[str, Any]) -> Any:
-        handler = self._registry.get_stage_agent(stage)
+        # Check if this is a sub-stage (phase within verification)
+        phase = context.get("phase")
+        if phase:
+            # Route to specialized agent (test_generation or simulation)
+            handler = self._registry.get_stage_agent(phase)
+        else:
+            # Route to main stage agent
+            handler = self._registry.get_stage_agent(stage)
+        
         return await handler(context)
 
     async def run_feedback(self, context: Mapping[str, Any]) -> FeedbackDecision:

@@ -231,6 +231,7 @@ docs/source/_build/
 # Test outputs
 test_outputs/
 test_results/
+tests/logs/
 *.json
 !test_algorithms/*.json  # Keep test vector JSONs
 

@@ -231,11 +231,99 @@ class ResponseJSONParser:
 
     def _extract_output_text(self, response: Any, stage: str) -> str:
         """Extract text from response for JSON parsing."""
+        # Debug: Print response structure for test_generation stage
+        if stage == "test_generation":
+            print(f"DEBUG[test_gen]: Response type: {type(response)}")
+            print(f"DEBUG[test_gen]: Response dir: {[attr for attr in dir(response) if not attr.startswith('_')]}")
+            if hasattr(response, 'output'):
+                print(f"DEBUG[test_gen]: Has output attr, type: {type(response.output)}")
+                if hasattr(response.output, '__len__'):
+                    print(f"DEBUG[test_gen]: Output length: {len(response.output)}")
+                    for i, item in enumerate(response.output):  # All items
+                        print(f"DEBUG[test_gen]: Output[{i}] type: {type(item)}")
+                        if hasattr(item, 'type'):
+                            print(f"DEBUG[test_gen]: Output[{i}].type: {item.type}")
+                        if hasattr(item, 'content'):
+                            content_preview = str(item.content)[:200] if item.content else None
+                            print(f"DEBUG[test_gen]: Output[{i}].content preview: {content_preview}")
+                            # Check if content is a string and try to parse it as JSON
+                            if isinstance(item.content, str):
+                                try:
+                                    import json
+                                    parsed = json.loads(item.content)
+                                    print(f"DEBUG[test_gen]: output[{i}].content IS VALID JSON!")
+                                    return item.content
+                                except json.JSONDecodeError:
+                                    pass
+
         text = getattr(response, "output_text", None)
         if text:
             extracted = self._extract_text_value(text)
             if extracted:
                 return extracted
+        # Special handling for test_generation stage - look for specific JSON structure
+        if stage == "test_generation":
+            print(f"DEBUG[test_gen]: Starting targeted JSON extraction for test_generation")
+
+            # Look for JSON that has the expected test_generation structure
+            def find_test_gen_json(obj, path=""):
+                if isinstance(obj, str):
+                    # Try to parse as JSON and check if it has test_generation structure
+                    try:
+                        parsed = json.loads(obj)
+                        if isinstance(parsed, dict):
+                            # Check if it has the expected keys for test_generation output
+                            expected_keys = {"test_vectors", "golden_outputs", "test_count", "coverage_areas"}
+                            if all(key in parsed for key in expected_keys):
+                                # Additional validation: check structure is complete
+                                if (isinstance(parsed.get("test_vectors"), list) and
+                                    isinstance(parsed.get("golden_outputs"), list) and
+                                    isinstance(parsed.get("test_count"), int) and
+                                    isinstance(parsed.get("coverage_areas"), list) and
+                                    len(parsed["test_vectors"]) == len(parsed["golden_outputs"]) and
+                                    len(parsed["test_vectors"]) >= 1 and len(parsed["test_vectors"]) <= 5):
+                                    print(f"DEBUG[test_gen]: Found complete test_generation JSON at {path}")
+                                    return obj
+                                else:
+                                    print(f"DEBUG[test_gen]: Found test_generation keys but incomplete structure at {path}")
+                            elif any(key in parsed for key in expected_keys):
+                                print(f"DEBUG[test_gen]: Found partial test_generation JSON at {path}")
+                                return obj
+                    except json.JSONDecodeError:
+                        pass
+                elif isinstance(obj, dict):
+                    for key, value in obj.items():
+                        result = find_test_gen_json(value, f"{path}.{key}")
+                        if result:
+                            return result
+                elif hasattr(obj, '__iter__') and not isinstance(obj, str):
+                    try:
+                        for i, item in enumerate(obj):
+                            result = find_test_gen_json(item, f"{path}[{i}]")
+                            if result:
+                                return result
+                    except TypeError:
+                        pass
+                # Try object attributes
+                if hasattr(obj, '__dict__'):
+                    for attr_name in dir(obj):
+                        if not attr_name.startswith('_'):
+                            try:
+                                attr_value = getattr(obj, attr_name)
+                                if not callable(attr_value):
+                                    result = find_test_gen_json(attr_value, f"{path}.{attr_name}")
+                                    if result:
+                                        return result
+                            except:
+                                pass
+                return None
+
+            json_content = find_test_gen_json(response, "response")
+            if json_content:
+                return json_content
+
+            print(f"DEBUG[test_gen]: No test_generation JSON structure found")
+
         for block in self._iter_response_blocks(response):
             if isinstance(block, str) and block:
                 return block

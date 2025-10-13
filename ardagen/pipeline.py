@@ -19,7 +19,6 @@ from pydantic import BaseModel
 from .core import PipelineOrchestrator, StageExecutionError
 from .core.stages import (
     EvaluateStage,
-    StaticChecksStage,
     MicroArchStage,
     ArchitectureStage,
     QuantStage,
@@ -60,16 +59,17 @@ class Pipeline:
         MicroArchStage,
         ArchitectureStage,
         RTLStage,
-        StaticChecksStage,
-        VerificationStage,
+        # StaticChecksStage removed - now part of VerificationStage Phase 1
+        VerificationStage,  # Now includes lint + test gen + simulation
         SynthStage,
         EvaluateStage,
     )
     _stage_names: Tuple[str, ...] = tuple(builder().name for builder in _stage_builders)
     _stage_order = StageOrder(names=_stage_names, index={name: idx for idx, name in enumerate(_stage_names)})
     _feedback_stages: frozenset[str] = frozenset(
-        {"spec", "quant", "microarch", "architecture", "rtl", "static_checks", "verification", "synth", "evaluate"}
+        {"spec", "quant", "microarch", "architecture", "rtl", "verification", "synth", "evaluate"}
     )
+    # Removed "static_checks" - now integrated into verification
 
     def __init__(
         self,
@@ -130,7 +130,7 @@ class Pipeline:
 
             try:
                 async for stage_name, stage_output in orchestrator.run_iter(
-                    run_inputs=run_inputs,
+                    run_inputs=self._add_feedback_to_run_inputs(run_inputs),
                     initial_results=initial_results,
                 ):
                     self.results[stage_name] = stage_output
@@ -339,6 +339,15 @@ class Pipeline:
             target = decision.target_stage or action.replace("retry_", "", 1)
             if not target:
                 target = stage
+
+            # Handle verification phase retries
+            verification_phases = {"lint", "test_generation", "simulation"}
+            if target in verification_phases:
+                retry_phase = target
+                target = "verification"
+                # Store the specific phase to retry in the decision
+                decision.target_stage = target
+                decision.guidance = f"retry_from_phase:{retry_phase}"
         elif action == "tune_microarch":
             target = decision.target_stage or "microarch"
         else:
@@ -348,6 +357,13 @@ class Pipeline:
             return "continue"
 
         return ("jump", self._stage_order.index[target])
+
+    def _add_feedback_to_run_inputs(self, run_inputs: Mapping[str, Any]) -> Dict[str, Any]:
+        """Add feedback information to run_inputs for stages that need it."""
+        inputs = dict(run_inputs)
+        if self.feedback_history:
+            inputs["last_feedback"] = self.feedback_history[-1].model_dump()
+        return inputs
 
     def _build_stage_context(
         self,
@@ -367,6 +383,11 @@ class Pipeline:
             "workspace_files": workspace.list_files() if workspace else [],
             "observability": self.observability,
         }
+
+        # Include last feedback decision if this is a retry
+        if self.feedback_history:
+            context["last_feedback"] = self.feedback_history[-1].model_dump()
+
         return context
 
     def _build_feedback_context(

@@ -1,13 +1,23 @@
 """
 Static checks stage enforcing code quality gates.
+
+DEPRECATED: Static checks are now integrated into VerificationStage Phase 1.
+This stage is kept for backward compatibility only.
 """
 
 from __future__ import annotations
 
+import warnings
 from typing import Any, Dict
 
 from .base import Stage, StageContext
 from ...domain import RTLConfig, LintResults
+
+warnings.warn(
+    "StaticChecksStage is deprecated. Use VerificationStage instead.",
+    DeprecationWarning,
+    stacklevel=2
+)
 
 
 class StaticChecksStage(Stage):
